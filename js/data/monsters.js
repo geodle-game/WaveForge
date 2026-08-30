@@ -2,7 +2,7 @@
 // WAVEFORGE - Monster Type Definitions (DATA)
 // ============================================
 
-// Use window to ensure global availability
+// Use window to ensure global availability – NO var declaration to avoid conflicts
 window.MONSTER_TYPES = {
     NORMAL: {
         name: 'Normal', color: '#ff6b6b', speed: 1,
@@ -76,8 +76,4 @@ window.MONSTER_TYPES = {
     }
 };
 
-// Also set as a regular variable for compatibility
-var MONSTER_TYPES = window.MONSTER_TYPES;
-
-// Log to confirm it loaded
 console.log('✅ MONSTER_TYPES loaded successfully');

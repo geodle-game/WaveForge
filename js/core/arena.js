@@ -20,8 +20,8 @@ const Arena = {
         this.bounds = {
             minX: 0,
             minY: 0,
-            maxX: CONFIG.CANVAS_WIDTH * 2,
-            maxY: CONFIG.CANVAS_HEIGHT * 2
+            maxX: CONFIG.CANVAS_WIDTH,    // Old size: 800
+            maxY: CONFIG.CANVAS_HEIGHT    // Old size: 600
         };
         this.generateDecorations();
     },

@@ -45,8 +45,8 @@ const Game = {
 
             console.log('Initializing Camera...');
             this.camera.init();
-            this.camera.worldWidth = CONFIG.CANVAS_WIDTH * 2;
-            this.camera.worldHeight = CONFIG.CANVAS_HEIGHT * 2;
+            this.camera.worldWidth = CONFIG.CANVAS_WIDTH;    // OLD SIZE - just 800
+            this.camera.worldHeight = CONFIG.CANVAS_HEIGHT;   // OLD SIZE - just 600
 
             console.log('Initializing Player...');
             Player.init();

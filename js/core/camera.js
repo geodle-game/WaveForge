@@ -7,47 +7,41 @@ const Camera = {
     y: 0,
     width: 800,
     height: 600,
-    worldWidth: 1600,
-    worldHeight: 1200,
+    worldWidth: 800,  // Changed from 1600 to 800 (old size)
+    worldHeight: 600, // Changed from 1200 to 600 (old size)
     smoothness: 0.1,
     
     init() {
         this.width = CONFIG.CANVAS_WIDTH;
         this.height = CONFIG.CANVAS_HEIGHT;
-        this.worldWidth = CONFIG.CANVAS_WIDTH * 2;
-        this.worldHeight = CONFIG.CANVAS_HEIGHT * 2;
+        this.worldWidth = CONFIG.CANVAS_WIDTH;  // Old size - just the canvas size
+        this.worldHeight = CONFIG.CANVAS_HEIGHT; // Old size - just the canvas size
         this.x = 0;
         this.y = 0;
     },
     
     follow(player) {
         if (!player) return;
-        const targetX = player.x - this.width / 2;
-        const targetY = player.y - this.height / 2;
-        const clampedX = Math.max(0, Math.min(this.worldWidth - this.width, targetX));
-        const clampedY = Math.max(0, Math.min(this.worldHeight - this.height, targetY));
-        this.x += (clampedX - this.x) * this.smoothness;
-        this.y += (clampedY - this.y) * this.smoothness;
+        // No need to follow - camera is static since world = canvas size
+        this.x = 0;
+        this.y = 0;
     },
     
     worldToScreen(worldX, worldY) {
-        return { x: worldX - this.x, y: worldY - this.y };
+        return { x: worldX, y: worldY };
     },
     
     screenToWorld(screenX, screenY) {
-        return { x: screenX + this.x, y: screenY + this.y };
+        return { x: screenX, y: screenY };
     },
     
     isVisible(worldX, worldY, margin = 50) {
-        return worldX >= this.x - margin && 
-               worldX <= this.x + this.width + margin &&
-               worldY >= this.y - margin && 
-               worldY <= this.y + this.height + margin;
+        return true; // Everything is visible since camera doesn't move
     },
     
     apply(ctx) {
+        // No translation needed for old size
         ctx.save();
-        ctx.translate(-this.x, -this.y);
     },
     
     restore(ctx) {

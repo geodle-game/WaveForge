@@ -45,7 +45,7 @@ const MapGenerators = {
     
     generateArena() {
         const walls = [];
-        const numObstacles = 8 + Math.floor(Math.random() * 6); // Fewer obstacles for old size
+        const numObstacles = 8 + Math.floor(Math.random() * 6);
         
         for (let i = 0; i < numObstacles; i++) {
             let x, y, valid = false;
@@ -136,3 +136,123 @@ const MapGenerators = {
         return walls;
     }
 };
+
+const MapSelection = {
+    selectedMap: 'empty_arena',
+
+    init() {
+        if (!document.getElementById('mapSelectionOverlay')) {
+            const overlay = document.createElement('div');
+            overlay.id = 'mapSelectionOverlay';
+            overlay.className = 'overlay';
+            overlay.style.display = 'none';
+            document.body.appendChild(overlay);
+        }
+        console.log('✅ MapSelection initialized');
+    },
+
+    show() {
+        console.log('🟢 MapSelection.show() called');
+        const overlay = document.getElementById('mapSelectionOverlay');
+        if (!overlay) {
+            console.error('❌ MapSelection overlay not found!');
+            return;
+        }
+
+        overlay.innerHTML = `
+            <div class="overlay-content" style="max-width: 900px; background: rgba(30,30,60,0.95); padding: 40px; border-radius: 20px; border: 3px solid #ffd700;">
+                <h2 class="overlay-title" style="font-size: 3rem; color: #ffd700; margin-bottom: 20px;">🗺️ Select Your Arena</h2>
+                <p style="color: #aaa; font-size: 1.2rem; margin-bottom: 30px;">Choose a map for your run.</p>
+                <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:15px;margin:20px 0;">
+                    ${this.generateMapButtons()}
+                </div>
+                <div style="margin-top:20px;">
+                    <button class="btn btn-primary" id="confirmMapBtn" style="width:200px;margin:0 auto; padding: 15px 30px; background: linear-gradient(45deg, #ff6b6b, #ffa726); color: white; border: none; border-radius: 8px; font-size: 1.2rem; cursor: pointer;">
+                        <span>⚔️</span> Start Battle
+                    </button>
+                </div>
+            </div>
+        `;
+
+        overlay.querySelectorAll('.map-btn').forEach(btn => {
+            btn.addEventListener('click', () => this.selectMap(btn.dataset.mapId));
+            btn.addEventListener('touchstart', (e) => {
+                e.preventDefault();
+                this.selectMap(btn.dataset.mapId);
+            });
+        });
+
+        const confirmBtn = document.getElementById('confirmMapBtn');
+        if (confirmBtn) {
+            confirmBtn.addEventListener('click', () => this.confirmMap());
+            confirmBtn.addEventListener('touchstart', (e) => {
+                e.preventDefault();
+                this.confirmMap();
+            });
+        }
+
+        overlay.style.display = 'flex';
+        console.log('✅ Map selection displayed');
+    },
+
+    generateMapButtons() {
+        let html = '';
+        for (let [id, map] of Object.entries(MAP_DEFINITIONS)) {
+            const selected = id === this.selectedMap ? 'selected' : '';
+            html += `
+                <div class="map-btn ${selected}" data-map-id="${id}" style="
+                    background: ${id === this.selectedMap ? 'rgba(255,215,0,0.2)' : 'rgba(50,50,100,0.3)'};
+                    border: ${id === this.selectedMap ? '3px solid #ffd700' : '2px solid #5555aa'};
+                    border-radius: 10px;
+                    padding: 15px;
+                    cursor: pointer;
+                    transition: all 0.2s;
+                    text-align: left;
+                ">
+                    <div style="font-size:2rem;margin-bottom:5px;">${map.icon}</div>
+                    <div style="font-weight:bold;color:#fff;font-size:1.1rem;">${map.name}</div>
+                    <div style="font-size:0.8rem;color:#aaa;">${map.description}</div>
+                    <div style="font-size:0.7rem;color:#666;margin-top:5px;">
+                        Difficulty: ${map.difficulty.toUpperCase()}
+                    </div>
+                </div>
+            `;
+        }
+        return html;
+    },
+
+    selectMap(mapId) {
+        console.log(`🟢 Selected map: ${mapId}`);
+        this.selectedMap = mapId;
+        const overlay = document.getElementById('mapSelectionOverlay');
+        overlay.querySelectorAll('.map-btn').forEach(btn => {
+            btn.style.background = 'rgba(50,50,100,0.3)';
+            btn.style.border = '2px solid #5555aa';
+            if (btn.dataset.mapId === mapId) {
+                btn.style.background = 'rgba(255,215,0,0.2)';
+                btn.style.border = '3px solid #ffd700';
+            }
+        });
+    },
+
+    confirmMap() {
+        console.log('🟢 confirmMap() called');
+        Game.currentMap = this.selectedMap;
+        document.getElementById('mapSelectionOverlay').style.display = 'none';
+        
+        const walls = MapGenerators.generateMap(this.selectedMap);
+        Arena.setWalls(walls);
+        
+        console.log(`✅ Map confirmed: ${this.selectedMap}, calling startGameWithMap()`);
+        Game.startGameWithMap();
+    }
+};
+
+// Initialize MapSelection when DOM is ready
+if (document.readyState === 'complete' || document.readyState === 'interactive') {
+    setTimeout(() => MapSelection.init(), 100);
+} else {
+    document.addEventListener('DOMContentLoaded', () => MapSelection.init());
+}
+
+console.log('✅ Maps system loaded');

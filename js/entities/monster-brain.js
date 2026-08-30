@@ -1,5 +1,5 @@
 // ============================================
-// WAVEFORGE - Monster Brain (AI System)
+// WAVEFORGE - Monster Brain (AI System with A* Pathfinding)
 // ============================================
 
 const MonsterBrain = {
@@ -11,12 +11,190 @@ const MonsterBrain = {
         SUPPORT: 'support'
     },
     
+    // A* Pathfinding grid
+    grid: null,
+    gridSize: 40,  // Grid cell size
+    gridCols: 0,
+    gridRows: 0,
+    
     init() {
         this.flocks.clear();
+        this.initGrid();
     },
     
     reset() {
         this.flocks.clear();
+        this.initGrid();
+    },
+    
+    // Initialize A* grid based on arena size
+    initGrid() {
+        const bounds = Arena.getBounds();
+        this.gridCols = Math.ceil((bounds.maxX - bounds.minX) / this.gridSize);
+        this.gridRows = Math.ceil((bounds.maxY - bounds.minY) / this.gridSize);
+        this.grid = new Array(this.gridCols * this.gridRows).fill(0);
+        
+        // Mark walls in grid
+        for (let wall of Arena.walls) {
+            if (wall.destroyed) continue;
+            const minCol = Math.floor((wall.x - wall.width/2 - bounds.minX) / this.gridSize);
+            const maxCol = Math.floor((wall.x + wall.width/2 - bounds.minX) / this.gridSize);
+            const minRow = Math.floor((wall.y - wall.height/2 - bounds.minY) / this.gridSize);
+            const maxRow = Math.floor((wall.y + wall.height/2 - bounds.minY) / this.gridSize);
+            
+            for (let col = Math.max(0, minCol); col <= Math.min(this.gridCols - 1, maxCol); col++) {
+                for (let row = Math.max(0, minRow); row <= Math.min(this.gridRows - 1, maxRow); row++) {
+                    this.grid[row * this.gridCols + col] = 1; // 1 = blocked
+                }
+            }
+        }
+    },
+    
+    // Convert world coordinates to grid coordinates
+    worldToGrid(x, y) {
+        const bounds = Arena.getBounds();
+        const col = Math.floor((x - bounds.minX) / this.gridSize);
+        const row = Math.floor((y - bounds.minY) / this.gridSize);
+        return { col: Math.max(0, Math.min(this.gridCols - 1, col)), 
+                 row: Math.max(0, Math.min(this.gridRows - 1, row)) };
+    },
+    
+    // Convert grid coordinates to world coordinates
+    gridToWorld(col, row) {
+        const bounds = Arena.getBounds();
+        return {
+            x: bounds.minX + (col + 0.5) * this.gridSize,
+            y: bounds.minY + (row + 0.5) * this.gridSize
+        };
+    },
+    
+    // Check if grid cell is walkable
+    isWalkable(col, row) {
+        if (col < 0 || col >= this.gridCols || row < 0 || row >= this.gridRows) return false;
+        return this.grid[row * this.gridCols + col] === 0;
+    },
+    
+    // A* Pathfinding algorithm
+    findPath(startX, startY, endX, endY) {
+        const start = this.worldToGrid(startX, startY);
+        const end = this.worldToGrid(endX, endY);
+        
+        // If start or end is blocked, find nearest walkable
+        if (!this.isWalkable(start.col, start.row)) {
+            const nearest = this.findNearestWalkable(start.col, start.row);
+            if (!nearest) return null;
+            start.col = nearest.col;
+            start.row = nearest.row;
+        }
+        if (!this.isWalkable(end.col, end.row)) {
+            const nearest = this.findNearestWalkable(end.col, end.row);
+            if (!nearest) return null;
+            end.col = nearest.col;
+            end.row = nearest.row;
+        }
+        
+        // A* algorithm
+        const openSet = new Map();
+        const closedSet = new Set();
+        const cameFrom = new Map();
+        const gScore = new Map();
+        const fScore = new Map();
+        
+        const startKey = `${start.col},${start.row}`;
+        const endKey = `${end.col},${end.row}`;
+        
+        openSet.set(startKey, { col: start.col, row: start.row });
+        gScore.set(startKey, 0);
+        fScore.set(startKey, this.heuristic(start.col, start.row, end.col, end.row));
+        
+        while (openSet.size > 0) {
+            // Find node with lowest fScore
+            let current = null;
+            let currentKey = null;
+            let lowestF = Infinity;
+            
+            for (let [key, node] of openSet) {
+                const f = fScore.get(key) || Infinity;
+                if (f < lowestF) {
+                    lowestF = f;
+                    current = node;
+                    currentKey = key;
+                }
+            }
+            
+            if (currentKey === endKey) {
+                // Path found - reconstruct path
+                return this.reconstructPath(cameFrom, currentKey);
+            }
+            
+            openSet.delete(currentKey);
+            closedSet.add(currentKey);
+            
+            // Check neighbors
+            const neighbors = [
+                { col: current.col + 1, row: current.row },
+                { col: current.col - 1, row: current.row },
+                { col: current.col, row: current.row + 1 },
+                { col: current.col, row: current.row - 1 },
+                { col: current.col + 1, row: current.row + 1 },
+                { col: current.col - 1, row: current.row - 1 },
+                { col: current.col + 1, row: current.row - 1 },
+                { col: current.col - 1, row: current.row + 1 }
+            ];
+            
+            for (let neighbor of neighbors) {
+                if (!this.isWalkable(neighbor.col, neighbor.row)) continue;
+                const neighborKey = `${neighbor.col},${neighbor.row}`;
+                if (closedSet.has(neighborKey)) continue;
+                
+                // Diagonal movement cost
+                const isDiagonal = neighbor.col !== current.col && neighbor.row !== current.row;
+                const tentativeG = (gScore.get(currentKey) || 0) + (isDiagonal ? 1.414 : 1);
+                
+                if (!openSet.has(neighborKey) || tentativeG < (gScore.get(neighborKey) || Infinity)) {
+                    cameFrom.set(neighborKey, currentKey);
+                    gScore.set(neighborKey, tentativeG);
+                    fScore.set(neighborKey, tentativeG + this.heuristic(neighbor.col, neighbor.row, end.col, end.row));
+                    openSet.set(neighborKey, neighbor);
+                }
+            }
+        }
+        
+        // No path found
+        return null;
+    },
+    
+    // Heuristic function (Manhattan distance)
+    heuristic(col1, row1, col2, row2) {
+        return Math.abs(col1 - col2) + Math.abs(row1 - row2);
+    },
+    
+    // Find nearest walkable cell
+    findNearestWalkable(col, row) {
+        for (let radius = 1; radius < 5; radius++) {
+            for (let c = col - radius; c <= col + radius; c++) {
+                for (let r = row - radius; r <= row + radius; r++) {
+                    if (this.isWalkable(c, r)) {
+                        return { col: c, row: r };
+                    }
+                }
+            }
+        }
+        return null;
+    },
+    
+    // Reconstruct path from cameFrom map
+    reconstructPath(cameFrom, currentKey) {
+        const path = [];
+        let key = currentKey;
+        
+        while (key) {
+            const [col, row] = key.split(',').map(Number);
+            path.unshift(this.gridToWorld(col, row));
+            key = cameFrom.get(key);
+        }
+        
+        return path;
     },
     
     formFlocks() {
@@ -99,56 +277,82 @@ const MonsterBrain = {
         const player = Player.entity;
         const flock = monster.flockId ? this.flocks.get(monster.flockId) : null;
         let moveX = 0, moveY = 0;
-        switch (monster.role) {
-            case this.roles.CHASER:
-                moveX = player.x - monster.x;
-                moveY = player.y - monster.y;
-                break;
-            case this.roles.FLANKER:
-                const flankAngle = Math.atan2(player.y - monster.y, player.x - monster.x) + Math.PI / 3;
-                const flankDist = 150;
-                const flankTargetX = player.x + Math.cos(flankAngle) * flankDist;
-                const flankTargetY = player.y + Math.sin(flankAngle) * flankDist;
-                moveX = flankTargetX - monster.x;
-                moveY = flankTargetY - monster.y;
-                break;
-            case this.roles.BLOCKER:
-                const centerX = CONFIG.CANVAS_WIDTH;
-                const centerY = CONFIG.CANVAS_HEIGHT;
-                const blockAngle = Math.atan2(centerY - player.y, centerX - player.x);
-                const blockDist = 120;
-                const blockTargetX = player.x + Math.cos(blockAngle) * blockDist;
-                const blockTargetY = player.y + Math.sin(blockAngle) * blockDist;
-                moveX = blockTargetX - monster.x;
-                moveY = blockTargetY - monster.y;
-                break;
-            case this.roles.SUPPORT:
-                if (flock) {
-                    const supportAngle = Math.atan2(player.y - flock.center.y, player.x - flock.center.x) + Math.PI;
-                    const supportDist = 100;
-                    const supportTargetX = flock.center.x + Math.cos(supportAngle) * supportDist;
-                    const supportTargetY = flock.center.y + Math.sin(supportAngle) * supportDist;
-                    moveX = supportTargetX - monster.x;
-                    moveY = supportTargetY - monster.y;
-                } else {
+        
+        // Use A* pathfinding for better navigation
+        const path = this.findPath(monster.x, monster.y, player.x, player.y);
+        
+        if (path && path.length > 1) {
+            // Move towards next waypoint in path
+            const nextWaypoint = path[1];
+            const dx = nextWaypoint.x - monster.x;
+            const dy = nextWaypoint.y - monster.y;
+            const dist = Math.hypot(dx, dy);
+            
+            if (dist > 0) {
+                moveX = dx / dist;
+                moveY = dy / dist;
+            }
+        } else {
+            // Direct movement if no path or simple case
+            switch (monster.role) {
+                case this.roles.CHASER:
                     moveX = player.x - monster.x;
                     moveY = player.y - monster.y;
-                }
-                break;
-            default:
-                moveX = player.x - monster.x;
-                moveY = player.y - monster.y;
+                    break;
+                case this.roles.FLANKER:
+                    const flankAngle = Math.atan2(player.y - monster.y, player.x - monster.x) + Math.PI / 3;
+                    const flankDist = 150;
+                    const flankTargetX = player.x + Math.cos(flankAngle) * flankDist;
+                    const flankTargetY = player.y + Math.sin(flankAngle) * flankDist;
+                    moveX = flankTargetX - monster.x;
+                    moveY = flankTargetY - monster.y;
+                    break;
+                case this.roles.BLOCKER:
+                    const centerX = CONFIG.CANVAS_WIDTH / 2;
+                    const centerY = CONFIG.CANVAS_HEIGHT / 2;
+                    const blockAngle = Math.atan2(centerY - player.y, centerX - player.x);
+                    const blockDist = 120;
+                    const blockTargetX = player.x + Math.cos(blockAngle) * blockDist;
+                    const blockTargetY = player.y + Math.sin(blockAngle) * blockDist;
+                    moveX = blockTargetX - monster.x;
+                    moveY = blockTargetY - monster.y;
+                    break;
+                case this.roles.SUPPORT:
+                    if (flock) {
+                        const supportAngle = Math.atan2(player.y - flock.center.y, player.x - flock.center.x) + Math.PI;
+                        const supportDist = 100;
+                        const supportTargetX = flock.center.x + Math.cos(supportAngle) * supportDist;
+                        const supportTargetY = flock.center.y + Math.sin(supportAngle) * supportDist;
+                        moveX = supportTargetX - monster.x;
+                        moveY = supportTargetY - monster.y;
+                    } else {
+                        moveX = player.x - monster.x;
+                        moveY = player.y - monster.y;
+                    }
+                    break;
+                default:
+                    moveX = player.x - monster.x;
+                    moveY = player.y - monster.y;
+            }
         }
+        
+        // Add random variation for organic movement
         moveX += (Math.random() - 0.5) * 20;
         moveY += (Math.random() - 0.5) * 20;
+        
+        // Flocking behavior
         if (flock && flock.members.length > 1) {
             const separationForce = this.getSeparationForce(monster, flock);
             const cohesionForce = this.getCohesionForce(monster, flock);
             moveX += separationForce.x * 0.5 + cohesionForce.x * 0.3;
             moveY += separationForce.y * 0.5 + cohesionForce.y * 0.3;
         }
+        
+        // Normalize movement
         const dist = Math.hypot(moveX, moveY);
         if (dist > 0) { moveX /= dist; moveY /= dist; }
+        
+        // Wall avoidance (in addition to A*)
         const testDist = 20;
         const testX = monster.x + moveX * testDist;
         const testY = monster.y + moveY * testDist;
@@ -166,7 +370,9 @@ const MonsterBrain = {
         if (blocked) {
             const alternatives = [
                 {x: 1, y: 0}, {x: -1, y: 0},
-                {x: 0, y: 1}, {x: 0, y: -1}
+                {x: 0, y: 1}, {x: 0, y: -1},
+                {x: 0.7, y: 0.7}, {x: -0.7, y: 0.7},
+                {x: 0.7, y: -0.7}, {x: -0.7, y: -0.7}
             ];
             let found = false;
             for (let alt of alternatives) {
@@ -192,14 +398,19 @@ const MonsterBrain = {
             }
             if (!found) { moveX = 0; moveY = 0; }
         }
+        
+        // Boundary avoidance
         const bounds = Arena.getBounds();
         const edgeMargin = 40;
         if (monster.x < bounds.minX + edgeMargin) moveX += 0.5;
         if (monster.x > bounds.maxX - edgeMargin) moveX -= 0.5;
         if (monster.y < bounds.minY + edgeMargin) moveY += 0.5;
         if (monster.y > bounds.maxY - edgeMargin) moveY -= 0.5;
+        
+        // Final normalization
         const finalDist = Math.hypot(moveX, moveY);
         if (finalDist > 0) { moveX /= finalDist; moveY /= finalDist; }
+        
         return { x: moveX, y: moveY };
     },
     
@@ -246,10 +457,19 @@ const MonsterBrain = {
     },
     
     update(currentTime) {
+        // Update A* grid periodically (walls might change)
+        if (!this._lastGridUpdate || currentTime - this._lastGridUpdate > 5000) {
+            this.initGrid();
+            this._lastGridUpdate = currentTime;
+        }
+        
+        // Update flocks periodically
         if (!this._lastFlockUpdate || currentTime - this._lastFlockUpdate > 3000) {
             this.formFlocks();
             this._lastFlockUpdate = currentTime;
         }
+        
+        // Update flock centers
         for (let [id, flock] of this.flocks) {
             this.updateFlockCenter(flock);
         }

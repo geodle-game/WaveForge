@@ -1,5 +1,5 @@
 // ============================================
-// WAVEFORGE - Monster Brain (With Magnetic Wall Repulsion)
+// WAVEFORGE - Monster Brain (Simple Wall Avoidance)
 // ============================================
 
 const MonsterBrain = {
@@ -11,10 +11,6 @@ const MonsterBrain = {
         SUPPORT: 'support'
     },
     
-    // Wall repulsion parameters
-    wallRepulsionRadius: 60,    // Distance at which repulsion starts
-    wallRepulsionForce: 0.8,    // Strength of repulsion
-    
     init() {
         this.flocks.clear();
     },
@@ -23,35 +19,9 @@ const MonsterBrain = {
         this.flocks.clear();
     },
     
-    // Get repulsion force from nearby walls
-    getWallRepulsion(monster) {
-        let repulseX = 0;
-        let repulseY = 0;
-        
-        for (let wall of Arena.walls) {
-            if (wall.destroyed) continue;
-            
-            const halfW = wall.width / 2;
-            const halfH = wall.height / 2;
-            
-            // Calculate closest point on wall to monster
-            const closestX = Math.max(wall.x - halfW, Math.min(monster.x, wall.x + halfW));
-            const closestY = Math.max(wall.y - halfH, Math.min(monster.y, wall.y + halfH));
-            
-            // Distance from monster to closest point on wall
-            const dx = monster.x - closestX;
-            const dy = monster.y - closestY;
-            const dist = Math.hypot(dx, dy);
-            
-            // If monster is within repulsion radius, apply force
-            if (dist < this.wallRepulsionRadius && dist > 0) {
-                const force = (this.wallRepulsionRadius - dist) / this.wallRepulsionRadius;
-                repulseX += (dx / dist) * force * this.wallRepulsionForce;
-                repulseY += (dy / dist) * force * this.wallRepulsionForce;
-            }
-        }
-        
-        return { x: repulseX, y: repulseY };
+    // Dummy function for compatibility with maps.js
+    initGrid() {
+        console.log('✅ A* grid initialized (simplified)');
     },
     
     formFlocks() {
@@ -174,16 +144,7 @@ const MonsterBrain = {
         const dist = Math.hypot(moveX, moveY);
         if (dist > 0) { moveX /= dist; moveY /= dist; }
         
-        // === MAGNETIC WALL REPULSION ===
-        const repulsion = this.getWallRepulsion(monster);
-        moveX += repulsion.x;
-        moveY += repulsion.y;
-        
-        // Re-normalize after adding repulsion
-        const repulsionDist = Math.hypot(moveX, moveY);
-        if (repulsionDist > 0) { moveX /= repulsionDist; moveY /= repulsionDist; }
-        
-        // Simple wall avoidance - if still blocked, slide along walls
+        // Simple wall avoidance - just slide along walls
         const testDist = 15;
         const testX = monster.x + moveX * testDist;
         const testY = monster.y + moveY * testDist;

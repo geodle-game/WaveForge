@@ -105,11 +105,7 @@ const Game = {
             console.log('All systems initialized successfully');
 
             this.setupKeyboard();
-
-            // Show start screen (don't start game loop until user clicks start)
             Overlays.showStart();
-
-            // Start game loop immediately - it will render the start screen
             this.gameLoop();
         } catch (e) {
             console.error('Game initialization error:', e);
@@ -143,9 +139,8 @@ const Game = {
             // Clear canvas every frame
             this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
 
-            // If game is in START state, just show the start screen (don't update game logic)
+            // If game is in START state, just show the start screen
             if (this.state === GAME_STATE.START) {
-                // Don't update anything, just keep rendering
                 requestAnimationFrame(() => this.gameLoop());
                 return;
             }
@@ -217,7 +212,7 @@ const Game = {
         this.kills = 0;
         this.refreshCount = 0;
         this.refreshCost = CONFIG.SHOP_REFRESH_BASE_COST;
-        this.waveActive = false;  // Start as false, Waves.startWave() will set to true
+        this.waveActive = false;
         this.pendingSpawns = 0;
         this.sandboxMode = false;
         this.gameWon = false;
@@ -244,6 +239,7 @@ const Game = {
 
         // Generate shop items
         Shop.generateItems();
+        console.log('✅ Shop items: ' + Shop.items.length);
 
         // === CRITICAL: Start the first wave ===
         console.log('🚀 Calling Waves.startWave()...');
@@ -258,6 +254,7 @@ const Game = {
 
         // Update HUD and hide overlays
         HUD.updateAll();
+        HUD.updateConsumables();
         Overlays.hideAll();
 
         console.log('✅ Game started! Wave 1 should now spawn monsters.');

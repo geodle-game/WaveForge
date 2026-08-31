@@ -14,8 +14,8 @@ const Camera = {
     init() {
         this.width = CONFIG.CANVAS_WIDTH;
         this.height = CONFIG.CANVAS_HEIGHT;
-        this.worldWidth = CONFIG.CANVAS_WIDTH * 2;  // Support for larger worlds
-        this.worldHeight = CONFIG.CANVAS_HEIGHT * 2;
+        this.worldWidth = CONFIG.CANVAS_WIDTH;
+        this.worldHeight = CONFIG.CANVAS_HEIGHT;
         this.x = 0;
         this.y = 0;
     },
@@ -65,22 +65,8 @@ const Camera = {
     },
     
     drawBounds(ctx) {
-        // Draw arena boundary
-        ctx.strokeStyle = 'rgba(255, 0, 0, 0.5)';
-        ctx.lineWidth = 3;
+        ctx.strokeStyle = 'rgba(255, 0, 0, 0.3)';
+        ctx.lineWidth = 2;
         ctx.strokeRect(0, 0, this.worldWidth, this.worldHeight);
-        
-        // Draw visible area
-        ctx.strokeStyle = 'rgba(0, 255, 0, 0.3)';
-        ctx.lineWidth = 1;
-        ctx.strokeRect(this.x, this.y, this.width, this.height);
-        
-        // Draw player position marker
-        if (Player.entity) {
-            ctx.fillStyle = 'rgba(0, 255, 0, 0.5)';
-            ctx.beginPath();
-            ctx.arc(Player.entity.x, Player.entity.y, 5, 0, Math.PI * 2);
-            ctx.fill();
-        }
     }
 };

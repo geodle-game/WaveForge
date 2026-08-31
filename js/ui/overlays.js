@@ -10,55 +10,24 @@ const Overlays = {
     
     setupStartScreen() {
         const startBtn = document.getElementById('startGameBtn');
-        const difficultySelect = document.getElementById('difficultySelect');
         
-        // Create difficulty selector if it doesn't exist
-        if (!difficultySelect.innerHTML) {
-            difficultySelect.innerHTML = `
-                <div class="overlay-content" style="max-width: 500px;">
-                    <h2 class="overlay-title">Select Difficulty</h2>
-                    <button class="btn btn-success diff-btn" data-mode="easy" style="width:100%;margin:8px 0;padding:15px;">
-                        🟢 Easy Mode
-                    </button>
-                    <button class="btn btn-primary diff-btn" data-mode="normal" style="width:100%;margin:8px 0;padding:15px;">
-                        🟡 Normal Mode
-                    </button>
-                    <button class="btn btn-danger diff-btn" data-mode="impossible" style="width:100%;margin:8px 0;padding:15px;">
-                        🔴 Impossible Mode
-                    </button>
-                    <div style="color:#aaa;font-size:0.8rem;margin-top:10px;">
-                        Easy: +15% dmg, -15% HP, +25% gold<br>
-                        Normal: Standard gameplay<br>
-                        Impossible: -10% dmg, +10% HP, -50% gold, harder waves
-                    </div>
-                </div>
-            `;
-            
-            difficultySelect.querySelectorAll('.diff-btn').forEach(btn => {
-                btn.addEventListener('click', (e) => {
-                    const mode = e.target.dataset.mode;
-                    Game.setDifficulty(mode);
-                    difficultySelect.style.display = 'none';
-                    Game.startGame();
-                });
-                btn.addEventListener('touchstart', (e) => {
-                    e.preventDefault();
-                    const mode = e.target.dataset.mode;
-                    Game.setDifficulty(mode);
-                    difficultySelect.style.display = 'none';
-                    Game.startGame();
-                });
-            });
-        }
-        
+        // Make Start button directly start the game
         startBtn.addEventListener('click', () => {
+            console.log('🎮 Start button clicked');
+            // Directly start with empty arena
+            Game.currentMap = 'empty_arena';
             document.getElementById('startScreen').style.display = 'none';
-            difficultySelect.style.display = 'flex';
+            Arena.setWalls([]);
+            Game.startGameWithMap();
         });
+        
         startBtn.addEventListener('touchstart', (e) => {
             e.preventDefault();
+            console.log('🎮 Start button touched');
+            Game.currentMap = 'empty_arena';
             document.getElementById('startScreen').style.display = 'none';
-            difficultySelect.style.display = 'flex';
+            Arena.setWalls([]);
+            Game.startGameWithMap();
         });
         
         // Continue game button - only show if save exists
@@ -85,14 +54,14 @@ const Overlays = {
         const restartBtn = document.getElementById('restartBtn');
         restartBtn.addEventListener('click', () => {
             this.hideAll();
-            document.getElementById('difficultySelect').style.display = 'flex';
+            document.getElementById('startScreen').style.display = 'flex';
             Game.sandboxMode = false;
             Game.gameWon = false;
         });
         restartBtn.addEventListener('touchstart', (e) => {
             e.preventDefault();
             this.hideAll();
-            document.getElementById('difficultySelect').style.display = 'flex';
+            document.getElementById('startScreen').style.display = 'flex';
             Game.sandboxMode = false;
             Game.gameWon = false;
         });

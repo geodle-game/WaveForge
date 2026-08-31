@@ -269,8 +269,8 @@ const Monsters = {
         Effects.deathEffect(monster.x, monster.y);
         Player.weapons.forEach(weapon => { if (weapon.isThrowable) { const returned = weapon.returnKnives?.(monster) || 0; if (returned > 0) Effects.healthPopup(monster.x, monster.y, returned); } });
         
-        if (monster.explosive && !monster.hasExploded) {
-            monster.hasExploded = true;
+        // === FIX: Explosive monsters ALWAYS explode on death ===
+        if (monster.explosive) {
             this.explode(monster);
         }
         
@@ -295,14 +295,16 @@ const Monsters = {
     },
     
     explode(monster) {
-        if (monster.hasExploded) return;
-        monster.hasExploded = true;
+        // Always explode - remove hasExploded check
+        if (monster._dead && monster.hasExploded) return;
         
-        const radius = monster.explosionRadius;
+        const radius = monster.explosionRadius || 100;
         const damage = monster.damage * (monster.explosionDamage || 2);
         
+        // Show explosion effect
         Effects.explosion(monster.x, monster.y, radius, '#FF4500');
         
+        // Damage other monsters
         const targets = [...this.active];
         for (let i = targets.length - 1; i >= 0; i--) {
             const other = targets[i];
@@ -319,9 +321,12 @@ const Monsters = {
             }
         }
         
+        // Damage player
         if (Player.entity && Physics.distance(monster, Player.entity) < radius + Player.entity.radius) {
             Player.takeDamage(damage, monster);
         }
+        
+        monster.hasExploded = true;
     },
     
     split(monster) {

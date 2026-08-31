@@ -7,9 +7,10 @@ boomerangProjImage.src = 'assets/boomerang.png';
 
 const Projectiles = {
     active: [], bossProjectiles: [], monsterProjectiles: [],
+    caltrops: [],
     
-    init() { this.active = []; this.bossProjectiles = []; this.monsterProjectiles = []; },
-    reset() { this.active = []; this.bossProjectiles = []; this.monsterProjectiles = []; },
+    init() { this.active = []; this.bossProjectiles = []; this.monsterProjectiles = []; this.caltrops = []; },
+    reset() { this.active = []; this.bossProjectiles = []; this.monsterProjectiles = []; this.caltrops = []; },
     
     spawn(data) { data.distanceTraveled = 0; data.startTime = data.startTime || Date.now(); data.targetsHit = data.targetsHit || []; this.active.push(data); return data; },
     
@@ -26,17 +27,25 @@ const Projectiles = {
         for (let i = 0; i < count; i++) { const spreadAngle = angle + (i - (count - 1) / 2) * 0.3; this.bossProjectiles.push({ x: boss.x, y: boss.y, angle: spreadAngle, speed: 3, damage: 15, radius: 8, color: boss.color, startTime: Date.now(), lifetime: 3000, type: 'boss' }); }
     },
     
-    update(currentTime) { this.updatePlayerProjectiles(currentTime); this.updateBossProjectiles(currentTime); this.updateMonsterProjectiles(currentTime); },
+    update(currentTime) { this.updatePlayerProjectiles(currentTime); this.updateBossProjectiles(currentTime); this.updateMonsterProjectiles(currentTime); this.updateCaltrops(currentTime); },
     
     updatePlayerProjectiles(currentTime) {
         for (let i = this.active.length - 1; i >= 0; i--) {
             const proj = this.active[i];
+            
+            // Caltrops are placed on ground, not moving projectiles
+            if (proj.isCaltrops) {
+                this.placeCaltrops(proj, i);
+                continue;
+            }
+            
             proj.x += Math.cos(proj.angle) * proj.speed;
             proj.y += Math.sin(proj.angle) * proj.speed;
             proj.distanceTraveled = (proj.distanceTraveled || 0) + proj.speed;
             
             if (proj.isBoomerang) { this.updateBoomerang(proj, i); continue; }
             if (proj.isThrownTrident) { this.updateThrownTrident(proj, i); continue; }
+            if (proj.isShuriken) { this.updateShuriken(proj, i); continue; }
             
             if (proj.distanceTraveled > proj.range || !Arena.isInBounds(proj.x, proj.y)) {
                 this.active.splice(i, 1);
@@ -50,6 +59,97 @@ const Projectiles = {
                     break;
                 }
             }
+        }
+    },
+    
+    // Place caltrops on ground
+    placeCaltrops(proj, index) {
+        // Place caltrop at current position
+        this.caltrops.push({
+            x: proj.x,
+            y: proj.y,
+            radius: proj.caltropRadius,
+            damage: proj.caltropDamage,
+            interval: proj.caltropInterval,
+            lastTick: Date.now(),
+            startTime: proj.startTime,
+            weaponRef: proj.weaponRef
+        });
+        
+        // Remove projectile after placing
+        this.active.splice(index, 1);
+    },
+    
+    // Update caltrops on ground
+    updateCaltrops(currentTime) {
+        for (let i = this.caltrops.length - 1; i >= 0; i--) {
+            const caltrop = this.caltrops[i];
+            
+            // Check enemies in range
+            for (let monster of Monsters.active) {
+                if (Physics.distance(caltrop, monster) < caltrop.radius + monster.radius) {
+                    // Deal damage every interval
+                    if (!monster.lastCaltropTick || currentTime - monster.lastCaltropTick >= caltrop.interval) {
+                        monster.health -= caltrop.damage;
+                        Effects.damageIndicator(monster.x, monster.y, caltrop.damage, false);
+                        monster.lastCaltropTick = currentTime;
+                        
+                        if (monster.health <= 0) {
+                            Monsters.handleDeath(monster, Monsters.active.indexOf(monster));
+                        }
+                    }
+                }
+            }
+        }
+    },
+    
+    // Shuriken bouncing logic
+    updateShuriken(proj, index) {
+        proj.rotation = (proj.rotation || 0) + (proj.spinSpeed || 0.3);
+        
+        // Check for hits
+        for (let j = Monsters.active.length - 1; j >= 0; j--) {
+            const m = Monsters.active[j];
+            if (proj.targetsHit.includes(m)) continue;
+            if (Physics.distance(proj, m) < m.radius + (proj.size || 4)) {
+                this.applyProjectileDamage(proj, m, j, index);
+                proj.targetsHit.push(m);
+                
+                // Check if shuriken should bounce
+                if (proj.bounceCount > 0) {
+                    // Find nearest new target
+                    let nearest = null;
+                    let nd = proj.bounceRange || 150;
+                    for (let k = 0; k < Monsters.active.length; k++) {
+                        if (k === j || proj.targetsHit.includes(Monsters.active[k])) continue;
+                        const d = Physics.distance(m, Monsters.active[k]);
+                        if (d < nd) {
+                            nd = d;
+                            nearest = Monsters.active[k];
+                        }
+                    }
+                    
+                    if (nearest) {
+                        // Bounce to next target
+                        proj.angle = Math.atan2(nearest.y - m.y, nearest.x - m.x);
+                        proj.x = m.x;
+                        proj.y = m.y;
+                        proj.bounceCount--;
+                        proj.distanceTraveled = 0;
+                        Messages.show(`Shuriken bounced! (${proj.bounceCount} left)`, 500);
+                        return;
+                    }
+                }
+                
+                // No more bounces - remove projectile
+                this.active.splice(index, 1);
+                return;
+            }
+        }
+        
+        // Check if out of range
+        if (proj.distanceTraveled > proj.range || !Arena.isInBounds(proj.x, proj.y)) {
+            this.active.splice(index, 1);
         }
     },
     
@@ -285,31 +385,19 @@ const Projectiles = {
         }
         
         // === PIERCING LOGIC (Crossbow & Machine Gun) ===
-        if (proj.weaponRef && proj.weaponRef.pierceCount > 1) {
-            // Initialize piercedEnemies array if not exists
+        if (proj.weaponRef && proj.weaponRef.pierceCount > 1 && !proj.isShuriken) {
             if (!proj.piercedEnemies) proj.piercedEnemies = [];
-            
-            // Add current monster to pierced list
             proj.piercedEnemies.push(monster);
             
-            // Check if we've pierced enough enemies
             if (proj.piercedEnemies.length >= proj.weaponRef.pierceCount) {
-                // Enough piercing - remove projectile
                 this.active.splice(pi, 1);
             } else {
-                // Continue flying through - don't remove projectile
-                // Don't reset distanceTraveled - let it keep going
-                // But don't hit the same enemy again
-                proj.distanceTraveled = 0; // Reset to continue through more enemies
+                proj.distanceTraveled = 0;
             }
         }
         // Regular projectile (no special effects)
-        else if (!proj.isBoomerang && !proj.bounceCount && !proj.isThrownTrident && !proj.pierceCount) {
+        else if (!proj.isBoomerang && !proj.bounceCount && !proj.isThrownTrident && !proj.pierceCount && !proj.isShuriken && !proj.isCaltrops) {
             this.active.splice(pi, 1);
-        }
-        // Fork Laser - handled separately
-        else if (proj.weaponRef && proj.weaponRef.forkLaser && proj.weaponId === 'laser') {
-            // Don't remove, laser keeps going
         }
         
         if (monster.health <= 0) {
@@ -324,10 +412,80 @@ const Projectiles = {
     // ---- DRAWING ----
     draw() {
         const ctx = Game.ctx;
-        for (let proj of this.active) { ctx.save(); if (proj.isBoomerang) this.drawBoomerang(ctx, proj); else if (proj.isThrownTrident) this.drawThrownTridentProjectile(ctx, proj); else if (proj.animation === 'knife') this.drawKnife(ctx, proj); else if (proj.animation === 'laser') this.drawLaser(ctx, proj); else if (proj.animation === 'sniper') this.drawSniper(ctx, proj); else if (proj.animation === 'bolt') this.drawCrossbowBolt(ctx, proj); else this.drawBullet(ctx, proj); ctx.restore(); }
+        for (let proj of this.active) { ctx.save(); if (proj.isBoomerang) this.drawBoomerang(ctx, proj); else if (proj.isThrownTrident) this.drawThrownTridentProjectile(ctx, proj); else if (proj.isShuriken) this.drawShuriken(ctx, proj); else if (proj.animation === 'knife') this.drawKnife(ctx, proj); else if (proj.animation === 'laser') this.drawLaser(ctx, proj); else if (proj.animation === 'sniper') this.drawSniper(ctx, proj); else if (proj.animation === 'bolt') this.drawCrossbowBolt(ctx, proj); else this.drawBullet(ctx, proj); ctx.restore(); }
         for (let weapon of Player.weapons) { if (weapon.id === 'spear' && weapon.isThrown) this.drawDroppedTrident(weapon); }
         for (let proj of this.bossProjectiles) { const age = Date.now() - proj.startTime, alpha = Math.min(1, 1 - age / proj.lifetime); ctx.save(); ctx.translate(proj.x, proj.y); ctx.shadowColor = proj.color; ctx.shadowBlur = 15 * alpha; ctx.fillStyle = proj.color; ctx.globalAlpha = alpha; ctx.beginPath(); ctx.arc(0, 0, proj.radius, 0, Math.PI * 2); ctx.fill(); ctx.restore(); }
         for (let proj of this.monsterProjectiles) { ctx.save(); ctx.translate(proj.x, proj.y); ctx.shadowColor = proj.color; ctx.shadowBlur = 10; ctx.fillStyle = proj.color; ctx.beginPath(); ctx.arc(0, 0, 5, 0, Math.PI * 2); ctx.fill(); ctx.fillStyle = '#FFF'; ctx.beginPath(); ctx.arc(0, 0, 2, 0, Math.PI * 2); ctx.fill(); ctx.restore(); }
+        this.drawCaltrops(ctx);
+    },
+    
+    // Draw caltrops on ground
+    drawCaltrops(ctx) {
+        for (let caltrop of this.caltrops) {
+            ctx.save();
+            ctx.translate(caltrop.x, caltrop.y);
+            ctx.shadowColor = '#8B4513';
+            ctx.shadowBlur = 10;
+            
+            // Draw caltrop spikes
+            ctx.fillStyle = '#8B4513';
+            ctx.strokeStyle = '#654321';
+            ctx.lineWidth = 1;
+            
+            // Draw 4 spikes
+            for (let i = 0; i < 4; i++) {
+                const angle = (i / 4) * Math.PI * 2;
+                const spikeLength = 10;
+                ctx.beginPath();
+                ctx.moveTo(0, 0);
+                ctx.lineTo(Math.cos(angle) * spikeLength, Math.sin(angle) * spikeLength);
+                ctx.lineTo(Math.cos(angle + 0.3) * spikeLength * 0.5, Math.sin(angle + 0.3) * spikeLength * 0.5);
+                ctx.closePath();
+                ctx.fill();
+                ctx.stroke();
+            }
+            
+            // Draw center
+            ctx.fillStyle = '#654321';
+            ctx.beginPath();
+            ctx.arc(0, 0, 3, 0, Math.PI * 2);
+            ctx.fill();
+            
+            ctx.restore();
+        }
+    },
+    
+    drawShuriken(ctx, proj) {
+        ctx.save();
+        ctx.translate(proj.x, proj.y);
+        ctx.rotate(proj.rotation);
+        ctx.shadowColor = '#C0C0C0';
+        ctx.shadowBlur = 10;
+        ctx.fillStyle = '#C0C0C0';
+        ctx.strokeStyle = '#808080';
+        ctx.lineWidth = 1;
+        
+        // Draw 4-pointed star
+        ctx.beginPath();
+        for (let i = 0; i < 4; i++) {
+            const angle = (i / 4) * Math.PI * 2;
+            const outer = 8;
+            const inner = 3;
+            if (i === 0) ctx.moveTo(Math.cos(angle) * outer, Math.sin(angle) * outer);
+            else ctx.lineTo(Math.cos(angle) * outer, Math.sin(angle) * outer);
+            ctx.lineTo(Math.cos(angle + Math.PI/4) * inner, Math.sin(angle + Math.PI/4) * inner);
+        }
+        ctx.closePath();
+        ctx.fill();
+        ctx.stroke();
+        
+        // Draw center hole
+        ctx.fillStyle = '#654321';
+        ctx.beginPath();
+        ctx.arc(0, 0, 2, 0, Math.PI * 2);
+        ctx.fill();
+        
+        ctx.restore();
     },
     
     drawBullet(ctx, proj) { ctx.shadowColor = proj.color; ctx.shadowBlur = 10; ctx.fillStyle = proj.color; ctx.beginPath(); ctx.arc(proj.x, proj.y, proj.size || 3, 0, Math.PI * 2); ctx.fill(); ctx.shadowBlur = 0; ctx.strokeStyle = proj.color; ctx.lineWidth = 1; ctx.beginPath(); ctx.moveTo(proj.x - Math.cos(proj.angle) * 8, proj.y - Math.sin(proj.angle) * 8); ctx.lineTo(proj.x, proj.y); ctx.stroke(); },

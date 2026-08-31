@@ -57,6 +57,15 @@ class WeaponInstance {
         this.pierceCount = weaponData.pierceCount || 1;
         this.dualStrike = weaponData.dualStrike || false;
         
+        // Shuriken properties
+        this.isShuriken = weaponData.isShuriken || false;
+        
+        // Caltrops properties
+        this.isCaltrops = weaponData.isCaltrops || false;
+        this.caltropRadius = weaponData.caltropRadius || 40;
+        this.caltropDamage = weaponData.caltropDamage || 20;
+        this.caltropInterval = weaponData.caltropInterval || 500;
+        
         // Upgrade properties (add these)
         this.doubleTap = false;  // Handgun Double Tap
         this.chokeMod = false;   // Shotgun Choke Mod
@@ -107,6 +116,9 @@ class WeaponInstance {
         this.thrownY = 0;
         this.pickupRange = weaponData.pickupRange || 80;   // increased default
         
+        // Caltrops upgrade effects
+        this.slowEffect = false;
+        
         this.tierMultipliers = weaponData.tierMultipliers || {};
         this.applyTierBonuses();
     }
@@ -123,9 +135,11 @@ class WeaponInstance {
             }
             if (this.tierMultipliers.pelletCount) this.pelletCount = Math.round(this.pelletCount * this.tierMultipliers.pelletCount[t]);
             if (this.tierMultipliers.bounceCount) this.bounceCount = Math.round(this.bounceCount * this.tierMultipliers.bounceCount[t]);
+            if (this.tierMultipliers.bounceRange) this.bounceRange = Math.round(this.bounceRange * this.tierMultipliers.bounceRange[t]);
             if (this.tierMultipliers.maxTargets) this.maxTargets = Math.round(this.maxTargets * this.tierMultipliers.maxTargets[t]);
             if (this.tierMultipliers.pierceCount) this.pierceCount = Math.round(this.pierceCount * this.tierMultipliers.pierceCount[t]);
             if (this.tierMultipliers.shockwaveIntensity) this.shockwaveIntensity *= this.tierMultipliers.shockwaveIntensity[t];
+            if (this.tierMultipliers.caltropRadius) this.caltropRadius = Math.round(this.caltropRadius * this.tierMultipliers.caltropRadius[t]);
         }
     }
     
@@ -147,6 +161,11 @@ class WeaponInstance {
         if (this.id === 'spear' && this.isThrown) {
             // Weak melee always available
             return (currentTime - this.lastAttack) >= (1000 / (this.attackSpeed * Player.attackSpeedMultiplier));
+        }
+        
+        // Caltrops are passive - always attack
+        if (this.isCaltrops) {
+            return true;
         }
         
         if (this.usesAmmo && this.currentAmmo <= 0) {
@@ -220,6 +239,8 @@ class WeaponInstance {
     }
     
     getTypeDescription() {
+        if (this.isCaltrops) return 'CALTRAPS';
+        if (this.isShuriken) return 'SHURIKEN';
         if (this.type === 'ranged') {
             if (this.id === 'shotgun') return 'SHOTGUN';
             if (this.id === 'laser') return 'ENERGY';

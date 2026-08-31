@@ -46,6 +46,7 @@ const Projectiles = {
             if (proj.isBoomerang) { this.updateBoomerang(proj, i); continue; }
             if (proj.isThrownTrident) { this.updateThrownTrident(proj, i); continue; }
             if (proj.isShuriken) { this.updateShuriken(proj, i); continue; }
+            if (proj.isLaser) { this.updateEnergyGun(proj, i); continue; }
             
             if (proj.distanceTraveled > proj.range || !Arena.isInBounds(proj.x, proj.y)) {
                 this.active.splice(i, 1);
@@ -62,19 +63,21 @@ const Projectiles = {
         }
     },
     
-    // Place caltrops on ground
+    // Place caltrops on ground - one at a time
     placeCaltrops(proj, index) {
-        // Place caltrop at current position
-        this.caltrops.push({
-            x: proj.x,
-            y: proj.y,
-            radius: proj.caltropRadius,
-            damage: proj.caltropDamage,
-            interval: proj.caltropInterval,
-            lastTick: Date.now(),
-            startTime: proj.startTime,
-            weaponRef: proj.weaponRef
-        });
+        // Only place if we don't have too many caltrops
+        if (this.caltrops.length < 10) {
+            this.caltrops.push({
+                x: proj.x,
+                y: proj.y,
+                radius: proj.caltropRadius || 40,
+                damage: proj.caltropDamage || 20,
+                interval: proj.caltropInterval || 500,
+                lastTick: Date.now(),
+                startTime: proj.startTime,
+                weaponRef: proj.weaponRef
+            });
+        }
         
         // Remove projectile after placing
         this.active.splice(index, 1);
@@ -136,7 +139,53 @@ const Projectiles = {
                         proj.y = m.y;
                         proj.bounceCount--;
                         proj.distanceTraveled = 0;
-                        Messages.show(`Shuriken bounced! (${proj.bounceCount} left)`, 500);
+                        return;
+                    }
+                }
+                
+                // No more bounces - remove projectile
+                this.active.splice(index, 1);
+                return;
+            }
+        }
+        
+        // Check if out of range
+        if (proj.distanceTraveled > proj.range || !Arena.isInBounds(proj.x, proj.y)) {
+            this.active.splice(index, 1);
+        }
+    },
+    
+    // Energy Gun bouncing logic
+    updateEnergyGun(proj, index) {
+        // Check for hits
+        for (let j = Monsters.active.length - 1; j >= 0; j--) {
+            const m = Monsters.active[j];
+            if (proj.targetsHit.includes(m)) continue;
+            if (Physics.distance(proj, m) < m.radius + (proj.size || 4)) {
+                this.applyProjectileDamage(proj, m, j, index);
+                proj.targetsHit.push(m);
+                
+                // Check if laser should bounce
+                if (proj.bounceCount > 0) {
+                    // Find nearest new target
+                    let nearest = null;
+                    let nd = proj.bounceRange || 100;
+                    for (let k = 0; k < Monsters.active.length; k++) {
+                        if (k === j || proj.targetsHit.includes(Monsters.active[k])) continue;
+                        const d = Physics.distance(m, Monsters.active[k]);
+                        if (d < nd) {
+                            nd = d;
+                            nearest = Monsters.active[k];
+                        }
+                    }
+                    
+                    if (nearest) {
+                        // Bounce to next target
+                        proj.angle = Math.atan2(nearest.y - m.y, nearest.x - m.x);
+                        proj.x = m.x;
+                        proj.y = m.y;
+                        proj.bounceCount--;
+                        proj.distanceTraveled = 0;
                         return;
                     }
                 }
@@ -385,7 +434,7 @@ const Projectiles = {
         }
         
         // === PIERCING LOGIC (Crossbow & Machine Gun) ===
-        if (proj.weaponRef && proj.weaponRef.pierceCount > 1 && !proj.isShuriken) {
+        if (proj.weaponRef && proj.weaponRef.pierceCount > 1 && !proj.isShuriken && !proj.isLaser) {
             if (!proj.piercedEnemies) proj.piercedEnemies = [];
             proj.piercedEnemies.push(monster);
             
@@ -394,6 +443,11 @@ const Projectiles = {
             } else {
                 proj.distanceTraveled = 0;
             }
+        }
+        // === BOUNCING LOGIC (Energy Gun, Shuriken) ===
+        else if (proj.isLaser || proj.isShuriken) {
+            // Bouncing is handled in updateEnergyGun / updateShuriken
+            // Don't remove here
         }
         // Regular projectile (no special effects)
         else if (!proj.isBoomerang && !proj.bounceCount && !proj.isThrownTrident && !proj.pierceCount && !proj.isShuriken && !proj.isCaltrops) {
@@ -548,7 +602,4 @@ const Projectiles = {
             ctx.restore();
         }
     },
-    drawKnife(ctx, proj) { proj.rotation = (proj.rotation || 0) + (proj.spinSpeed || 0.3); ctx.save(); ctx.translate(proj.x, proj.y); ctx.rotate(proj.rotation); ctx.fillStyle = '#C0C0C0'; ctx.strokeStyle = '#808080'; ctx.lineWidth = 1; ctx.beginPath(); ctx.moveTo(0, -proj.size); ctx.lineTo(proj.size, 0); ctx.lineTo(0, proj.size); ctx.lineTo(-proj.size, 0); ctx.closePath(); ctx.fill(); ctx.stroke(); ctx.restore(); },
-    drawLaser(ctx, proj) { const pulse = Math.sin(Date.now() * 0.02) * 2; ctx.shadowColor = '#0FF'; ctx.shadowBlur = 20; ctx.strokeStyle = '#0FF'; ctx.lineWidth = 4 + pulse; ctx.beginPath(); ctx.moveTo(proj.x - Math.cos(proj.angle) * 10, proj.y - Math.sin(proj.angle) * 10); ctx.lineTo(proj.x, proj.y); ctx.stroke(); ctx.fillStyle = 'rgba(0,255,255,0.3)'; ctx.beginPath(); ctx.arc(proj.x, proj.y, 6, 0, Math.PI * 2); ctx.fill(); },
-    drawSniper(ctx, proj) { ctx.save(); ctx.translate(proj.x, proj.y); ctx.shadowColor = '#FF4500'; ctx.shadowBlur = 20; ctx.fillStyle = '#FFD700'; ctx.beginPath(); ctx.arc(0, 0, 5, 0, Math.PI * 2); ctx.fill(); ctx.strokeStyle = '#FF4500'; ctx.lineWidth = 3; ctx.beginPath(); ctx.moveTo(-Math.cos(proj.angle) * 15, -Math.sin(proj.angle) * 15); ctx.lineTo(0, 0); ctx.stroke(); ctx.restore(); }
-};
+    drawKnife(ctx, proj) { proj.rotation = (proj.rotation || 0) + (proj.spinSpeed || 0.3); ctx.save(); ctx.translate(proj.x, proj.y); ctx.rotate(proj.rotation); ctx.fillStyle = '#C0C0C0'; ctx.strokeStyle = '#808080'; ctx.lineWidth = 1; ctx.beginPath(); ctx.moveTo(0, -proj.size); ctx.lineTo(proj.size, 0); ctx.lineTo(0, proj.size); ctx.lineTo(-proj.size, 0); ctx.closePath(); ctx.fill(); ctx.stroke(); ctx.restore();

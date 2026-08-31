@@ -23,7 +23,7 @@ const MAP_DEFINITIONS = {
         id: 'backrooms',
         name: 'Backrooms',
         icon: '🚪',
-        description: 'Maze-like walls. Use A* pathfinding!',
+        description: 'Maze-like walls.',
         difficulty: 'hard',
         walls: []
     }
@@ -55,7 +55,6 @@ const MapGenerators = {
                 x = 80 + Math.random() * (CONFIG.CANVAS_WIDTH - 160);
                 y = 80 + Math.random() * (CONFIG.CANVAS_HEIGHT - 160);
                 
-                // Keep center clear for player
                 if (Math.hypot(x - CONFIG.CANVAS_WIDTH/2, y - CONFIG.CANVAS_HEIGHT/2) < 100) continue;
                 
                 let overlap = false;
@@ -97,7 +96,7 @@ const MapGenerators = {
     },
     
     generateBackrooms() {
-        // Maze-like walls for A* pathfinding testing
+        // Simplified for old size
         const walls = [];
         const wallThickness = 12;
         const roomSize = 100;
@@ -109,100 +108,28 @@ const MapGenerators = {
                 const cx = x * roomSize + roomSize / 2;
                 const cy = y * roomSize + roomSize / 2;
                 
-                // Horizontal walls with gaps
                 if (Math.random() < 0.3) {
-                    const hasGap = Math.random() < 0.3;
-                    if (hasGap) {
-                        const gapSize = 30;
-                        const gapStart = (roomSize - gapSize) / 2;
-                        
-                        // Left segment
-                        walls.push({
-                            x: cx - roomSize/2 + gapStart/2,
-                            y: cy,
-                            width: gapStart,
-                            height: wallThickness,
-                            color: '#2a2a4a',
-                            health: Infinity,
-                            indestructible: true
-                        });
-                        
-                        // Right segment
-                        walls.push({
-                            x: cx + gapStart/2 + gapSize,
-                            y: cy,
-                            width: gapStart,
-                            height: wallThickness,
-                            color: '#2a2a4a',
-                            health: Infinity,
-                            indestructible: true
-                        });
-                    } else {
-                        walls.push({
-                            x: cx, y: cy,
-                            width: roomSize,
-                            height: wallThickness,
-                            color: '#2a2a4a',
-                            health: Infinity,
-                            indestructible: true
-                        });
-                    }
+                    walls.push({
+                        x: cx, y: cy,
+                        width: roomSize,
+                        height: wallThickness,
+                        color: '#2a2a4a',
+                        health: Infinity,
+                        indestructible: true
+                    });
                 }
                 
-                // Vertical walls with gaps
                 if (Math.random() < 0.3) {
-                    const hasGap = Math.random() < 0.3;
-                    if (hasGap) {
-                        const gapSize = 30;
-                        const gapStart = (roomSize - gapSize) / 2;
-                        
-                        // Top segment
-                        walls.push({
-                            x: cx,
-                            y: cy - roomSize/2 + gapStart/2,
-                            width: wallThickness,
-                            height: gapStart,
-                            color: '#2a2a4a',
-                            health: Infinity,
-                            indestructible: true
-                        });
-                        
-                        // Bottom segment
-                        walls.push({
-                            x: cx,
-                            y: cy + gapStart/2 + gapSize,
-                            width: wallThickness,
-                            height: gapStart,
-                            color: '#2a2a4a',
-                            health: Infinity,
-                            indestructible: true
-                        });
-                    } else {
-                        walls.push({
-                            x: cx, y: cy,
-                            width: wallThickness,
-                            height: roomSize,
-                            color: '#2a2a4a',
-                            health: Infinity,
-                            indestructible: true
-                        });
-                    }
+                    walls.push({
+                        x: cx, y: cy,
+                        width: wallThickness,
+                        height: roomSize,
+                        color: '#2a2a4a',
+                        health: Infinity,
+                        indestructible: true
+                    });
                 }
             }
-        }
-        
-        // Add some random obstacles
-        for (let i = 0; i < 5; i++) {
-            const x = 50 + Math.random() * (CONFIG.CANVAS_WIDTH - 100);
-            const y = 50 + Math.random() * (CONFIG.CANVAS_HEIGHT - 100);
-            walls.push({
-                x, y,
-                width: 20 + Math.random() * 20,
-                height: 20 + Math.random() * 20,
-                color: '#3a3a5a',
-                health: Infinity,
-                indestructible: true
-            });
         }
         
         return walls;
@@ -318,12 +245,6 @@ const MapSelection = {
         // Generate new walls for selected map
         const walls = MapGenerators.generateMap(this.selectedMap);
         Arena.setWalls(walls);
-        
-        // Initialize MonsterBrain grid for A* pathfinding
-        if (typeof MonsterBrain !== 'undefined') {
-            MonsterBrain.initGrid();
-            console.log('✅ A* grid initialized for map:', this.selectedMap);
-        }
         
         console.log(`✅ Map confirmed: ${this.selectedMap}, calling startGameWithMap()`);
         Game.startGameWithMap();

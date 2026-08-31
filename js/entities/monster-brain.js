@@ -1,5 +1,5 @@
 // ============================================
-// WAVEFORGE - Monster Brain (Simple Wall Avoidance)
+// WAVEFORGE - Monster Brain (Simple Direct Movement)
 // ============================================
 
 const MonsterBrain = {
@@ -17,113 +17,6 @@ const MonsterBrain = {
     
     reset() {
         this.flocks.clear();
-    },
-    
-    // Check if there's a wall between two points
-    isWallBetween(x1, y1, x2, y2) {
-        const dx = x2 - x1;
-        const dy = y2 - y1;
-        const dist = Math.hypot(dx, dy);
-        const steps = Math.ceil(dist / 10);
-        
-        for (let i = 1; i < steps; i++) {
-            const t = i / steps;
-            const px = x1 + dx * t;
-            const py = y1 + dy * t;
-            
-            for (let wall of Arena.walls) {
-                if (wall.destroyed) continue;
-                const halfW = wall.width / 2;
-                const halfH = wall.height / 2;
-                if (px >= wall.x - halfW && px <= wall.x + halfW &&
-                    py >= wall.y - halfH && py <= wall.y + halfH) {
-                    return true;
-                }
-            }
-        }
-        return false;
-    },
-    
-    // Find a waypoint around a wall
-    findWaypointAroundWall(monster, targetX, targetY) {
-        const wall = this.findBlockingWall(monster.x, monster.y, targetX, targetY);
-        if (!wall) return null;
-        
-        // Try to go around the wall - try different angles
-        const wallHalfW = wall.width / 2 + 20;
-        const wallHalfH = wall.height / 2 + 20;
-        
-        // Try 4 sides of the wall
-        const waypoints = [
-            { x: wall.x - wallHalfW - 10, y: wall.y },           // Left
-            { x: wall.x + wallHalfW + 10, y: wall.y },           // Right
-            { x: wall.x, y: wall.y - wallHalfH - 10 },           // Top
-            { x: wall.x, y: wall.y + wallHalfH + 10 },           // Bottom
-            { x: wall.x - wallHalfW - 10, y: wall.y - wallHalfH - 10 }, // Top-Left
-            { x: wall.x + wallHalfW + 10, y: wall.y - wallHalfH - 10 }, // Top-Right
-            { x: wall.x - wallHalfW - 10, y: wall.y + wallHalfH + 10 }, // Bottom-Left
-            { x: wall.x + wallHalfW + 10, y: wall.y + wallHalfH + 10 }  // Bottom-Right
-        ];
-        
-        // Find the closest waypoint that has clear line of sight to both monster and target
-        let bestWaypoint = null;
-        let bestDist = Infinity;
-        
-        for (let wp of waypoints) {
-            // Check if waypoint is inside any wall
-            let insideWall = false;
-            for (let w of Arena.walls) {
-                if (w.destroyed) continue;
-                const halfW = w.width / 2;
-                const halfH = w.height / 2;
-                if (wp.x >= w.x - halfW && wp.x <= w.x + halfW &&
-                    wp.y >= w.y - halfH && wp.y <= w.y + halfH) {
-                    insideWall = true;
-                    break;
-                }
-            }
-            if (insideWall) continue;
-            
-            // Check line of sight from monster to waypoint
-            if (this.isWallBetween(monster.x, monster.y, wp.x, wp.y)) continue;
-            
-            // Check line of sight from waypoint to target
-            if (this.isWallBetween(wp.x, wp.y, targetX, targetY)) continue;
-            
-            // Calculate distance to monster
-            const dist = Math.hypot(wp.x - monster.x, wp.y - monster.y);
-            if (dist < bestDist) {
-                bestDist = dist;
-                bestWaypoint = wp;
-            }
-        }
-        
-        return bestWaypoint;
-    },
-    
-    // Find the wall blocking the path
-    findBlockingWall(x1, y1, x2, y2) {
-        const dx = x2 - x1;
-        const dy = y2 - y1;
-        const dist = Math.hypot(dx, dy);
-        const steps = Math.ceil(dist / 10);
-        
-        for (let i = 1; i < steps; i++) {
-            const t = i / steps;
-            const px = x1 + dx * t;
-            const py = y1 + dy * t;
-            
-            for (let wall of Arena.walls) {
-                if (wall.destroyed) continue;
-                const halfW = wall.width / 2;
-                const halfH = wall.height / 2;
-                if (px >= wall.x - halfW && px <= wall.x + halfW &&
-                    py >= wall.y - halfH && py <= wall.y + halfH) {
-                    return wall;
-                }
-            }
-        }
-        return null;
     },
     
     formFlocks() {
@@ -205,20 +98,10 @@ const MonsterBrain = {
         if (monster.isDasher && monster.isDashing) return { x: 0, y: 0 };
         const player = Player.entity;
         const flock = monster.flockId ? this.flocks.get(monster.flockId) : null;
-        let moveX = 0, moveY = 0;
         
-        // Direct movement towards player
-        moveX = player.x - monster.x;
-        moveY = player.y - monster.y;
-        
-        // Check if there's a wall blocking the direct path
-        if (this.isWallBetween(monster.x, monster.y, player.x, player.y)) {
-            const waypoint = this.findWaypointAroundWall(monster, player.x, player.y);
-            if (waypoint) {
-                moveX = waypoint.x - monster.x;
-                moveY = waypoint.y - monster.y;
-            }
-        }
+        // Direct movement towards player - simplest and most stable
+        let moveX = player.x - monster.x;
+        let moveY = player.y - monster.y;
         
         // Role-based modification
         switch (monster.role) {
@@ -256,7 +139,7 @@ const MonsterBrain = {
         const dist = Math.hypot(moveX, moveY);
         if (dist > 0) { moveX /= dist; moveY /= dist; }
         
-        // Simple wall sliding - if blocked, try sliding along wall
+        // Simple wall avoidance - just slide along walls
         const testDist = 15;
         const testX = monster.x + moveX * testDist;
         const testY = monster.y + moveY * testDist;
@@ -274,7 +157,7 @@ const MonsterBrain = {
         }
         
         if (blocked) {
-            // Try perpendicular directions (slide along wall)
+            // Try to slide along walls - check alternative directions
             const alternatives = [
                 {x: moveY, y: -moveX},   // Perpendicular right
                 {x: -moveY, y: moveX},   // Perpendicular left

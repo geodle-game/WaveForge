@@ -1,5 +1,5 @@
 // ============================================
-// WAVEFORGE - Monster Brain (AI System with A* Pathfinding)
+// WAVEFORGE - Monster Brain (AI System with Smooth A* Pathfinding)
 // ============================================
 
 const MonsterBrain = {
@@ -17,13 +17,20 @@ const MonsterBrain = {
     gridCols: 0,
     gridRows: 0,
     
+    // Path cache to avoid recalculating every frame
+    pathCache: new Map(),
+    pathCacheMaxSize: 100,
+    pathRecalcInterval: 1000, // Recalculate path every 1 second
+    
     init() {
         this.flocks.clear();
+        this.pathCache.clear();
         this.initGrid();
     },
     
     reset() {
         this.flocks.clear();
+        this.pathCache.clear();
         this.initGrid();
     },
     
@@ -197,6 +204,25 @@ const MonsterBrain = {
         return path;
     },
     
+    // Get cached path for monster
+    getCachedPath(monster) {
+        const cacheKey = `${monster.id || monster.type}_${Math.round(monster.x / 50)}_${Math.round(monster.y / 50)}_${Math.round(Player.entity.x / 50)}_${Math.round(Player.entity.y / 50)}`;
+        return this.pathCache.get(cacheKey);
+    },
+    
+    // Cache path for monster
+    cachePath(monster, path) {
+        const cacheKey = `${monster.id || monster.type}_${Math.round(monster.x / 50)}_${Math.round(monster.y / 50)}_${Math.round(Player.entity.x / 50)}_${Math.round(Player.entity.y / 50)}`;
+        
+        // Limit cache size
+        if (this.pathCache.size >= this.pathCacheMaxSize) {
+            const firstKey = this.pathCache.keys().next().value;
+            this.pathCache.delete(firstKey);
+        }
+        
+        this.pathCache.set(cacheKey, { path, timestamp: Date.now() });
+    },
+    
     formFlocks() {
         this.flocks.clear();
         const unassigned = [...Monsters.active];
@@ -278,22 +304,48 @@ const MonsterBrain = {
         const flock = monster.flockId ? this.flocks.get(monster.flockId) : null;
         let moveX = 0, moveY = 0;
         
-        // Use A* pathfinding for better navigation
-        const path = this.findPath(monster.x, monster.y, player.x, player.y);
+        // Get or calculate path (recalculate every ~1 second)
+        const now = Date.now();
+        let path = null;
         
+        if (monster._lastPathRecalc && now - monster._lastPathRecalc < this.pathRecalcInterval) {
+            // Use cached path if still valid
+            path = monster._currentPath;
+        } else {
+            // Calculate new path
+            path = this.findPath(monster.x, monster.y, player.x, player.y);
+            monster._currentPath = path;
+            monster._lastPathRecalc = now;
+        }
+        
+        // Smooth path following - skip waypoints that are too close
         if (path && path.length > 1) {
-            // Move towards next waypoint in path
-            const nextWaypoint = path[1];
+            // Skip waypoints we've already passed
+            let nextIndex = 1;
+            while (nextIndex < path.length - 1) {
+                const waypoint = path[nextIndex];
+                const distToWaypoint = Math.hypot(waypoint.x - monster.x, waypoint.y - monster.y);
+                if (distToWaypoint < 30) {
+                    nextIndex++;
+                } else {
+                    break;
+                }
+            }
+            
+            const nextWaypoint = path[nextIndex];
             const dx = nextWaypoint.x - monster.x;
             const dy = nextWaypoint.y - monster.y;
             const dist = Math.hypot(dx, dy);
             
-            if (dist > 0) {
+            // Only move if we're not at the waypoint
+            if (dist > 5) {
                 moveX = dx / dist;
                 moveY = dy / dist;
             }
-        } else {
-            // Direct movement if no path or simple case
+        }
+        
+        // If no path found or too close to waypoint, direct movement
+        if (moveX === 0 && moveY === 0) {
             switch (monster.role) {
                 case this.roles.CHASER:
                     moveX = player.x - monster.x;
@@ -336,23 +388,23 @@ const MonsterBrain = {
             }
         }
         
-        // Add random variation for organic movement
-        moveX += (Math.random() - 0.5) * 20;
-        moveY += (Math.random() - 0.5) * 20;
+        // Reduce random variation to prevent jitter
+        moveX += (Math.random() - 0.5) * 5;
+        moveY += (Math.random() - 0.5) * 5;
         
-        // Flocking behavior
+        // Flocking behavior (with reduced force)
         if (flock && flock.members.length > 1) {
             const separationForce = this.getSeparationForce(monster, flock);
             const cohesionForce = this.getCohesionForce(monster, flock);
-            moveX += separationForce.x * 0.5 + cohesionForce.x * 0.3;
-            moveY += separationForce.y * 0.5 + cohesionForce.y * 0.3;
+            moveX += separationForce.x * 0.3 + cohesionForce.x * 0.2;
+            moveY += separationForce.y * 0.3 + cohesionForce.y * 0.2;
         }
         
         // Normalize movement
         const dist = Math.hypot(moveX, moveY);
         if (dist > 0) { moveX /= dist; moveY /= dist; }
         
-        // Wall avoidance (in addition to A*)
+        // Wall avoidance
         const testDist = 20;
         const testX = monster.x + moveX * testDist;
         const testY = monster.y + moveY * testDist;
@@ -402,10 +454,10 @@ const MonsterBrain = {
         // Boundary avoidance
         const bounds = Arena.getBounds();
         const edgeMargin = 40;
-        if (monster.x < bounds.minX + edgeMargin) moveX += 0.5;
-        if (monster.x > bounds.maxX - edgeMargin) moveX -= 0.5;
-        if (monster.y < bounds.minY + edgeMargin) moveY += 0.5;
-        if (monster.y > bounds.maxY - edgeMargin) moveY -= 0.5;
+        if (monster.x < bounds.minX + edgeMargin) moveX += 0.3;
+        if (monster.x > bounds.maxX - edgeMargin) moveX -= 0.3;
+        if (monster.y < bounds.minY + edgeMargin) moveY += 0.3;
+        if (monster.y > bounds.maxY - edgeMargin) moveY -= 0.3;
         
         // Final normalization
         const finalDist = Math.hypot(moveX, moveY);
@@ -453,6 +505,11 @@ const MonsterBrain = {
                     flock.leader = flock.members[0];
                 }
             }
+        }
+        
+        // Clear path cache for dead monster
+        if (monster._currentPath) {
+            monster._currentPath = null;
         }
     },
     

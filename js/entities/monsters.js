@@ -251,13 +251,14 @@ const Monsters = {
     },
     
     remove(monster, index) {
-        if (index === undefined) index = this.active.indexOf(monster);
+        if (index === undefined || index === -1) index = this.active.indexOf(monster);
         if (index > -1) this.active.splice(index, 1);
     },
     
     handleDeath(monster, index) {
         if (monster._dead) return;
         monster._dead = true;
+        
         let goldDrop = 0;
         if (monster.monsterType && monster.monsterType.goldDrop) {
             goldDrop = Math.floor((Math.random() * (monster.monsterType.goldDrop.max - monster.monsterType.goldDrop.min + 1) + monster.monsterType.goldDrop.min) * (1 + Player.goldMultiplier) * Game.difficultyMultipliers.goldGain);
@@ -267,61 +268,30 @@ const Monsters = {
         Player.addGold(goldDrop);
         Game.addKill();
         Effects.deathEffect(monster.x, monster.y);
-        Player.weapons.forEach(weapon => { if (weapon.isThrowable) { const returned = weapon.returnKnives?.(monster) || 0; if (returned > 0) Effects.healthPopup(monster.x, monster.y, returned); } });
         
-        // === FIX: Explosive monsters ALWAYS explode on death ===
+        // Explosive monsters explode on death (visual only + damage player)
         if (monster.explosive) {
             this.explode(monster);
         }
         
-        if (Player.explosiveKills && !monster.isBoss) {
-            Effects.explosion(monster.x, monster.y, 80, '#FF6600');
-            for (let i = this.active.length - 1; i >= 0; i--) {
-                if (i === index) continue;
-                const other = this.active[i];
-                if (other._dead) continue;
-                if (Physics.distance(monster, other) < 80 + other.radius) { 
-                    other.health -= 50; 
-                    Effects.damageIndicator(other.x, other.y, 50, false); 
-                    if (other.health <= 0) this.handleDeath(other, i); 
-                }
-            }
-        }
-        
+        // Splitter logic
         if (monster.isSplitter) this.split(monster);
+        
         MonsterBrain.onMonsterDeath(monster);
         this.remove(monster, index);
         document.getElementById('monsterCount').textContent = `Monsters: ${this.active.length + Game.pendingSpawns}`;
     },
     
     explode(monster) {
-        // Always explode - remove hasExploded check
         if (monster._dead && monster.hasExploded) return;
         
         const radius = monster.explosionRadius || 100;
         const damage = monster.damage * (monster.explosionDamage || 2);
         
-        // Show explosion effect
+        // Show explosion effect - visual only
         Effects.explosion(monster.x, monster.y, radius, '#FF4500');
         
-        // Damage other monsters
-        const targets = [...this.active];
-        for (let i = targets.length - 1; i >= 0; i--) {
-            const other = targets[i];
-            if (other === monster) continue;
-            if (other._dead) continue;
-            if (Physics.distance(monster, other) < radius + other.radius) { 
-                other.health -= damage; 
-                Effects.damageIndicator(other.x, other.y, damage, false); 
-                if (other.health <= 0) {
-                    const idx = this.active.indexOf(other);
-                    if (idx > -1) this.active.splice(idx, 1);
-                    this.handleDeath(other, -1);
-                }
-            }
-        }
-        
-        // Damage player
+        // Damage player only (NOT other monsters)
         if (Player.entity && Physics.distance(monster, Player.entity) < radius + Player.entity.radius) {
             Player.takeDamage(damage, monster);
         }

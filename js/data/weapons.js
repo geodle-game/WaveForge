@@ -84,6 +84,20 @@ const WEAPON_DATA = [
         }
     },
     {
+        id: 'shuriken', name: 'Shuriken', icon: '𖣘', type: 'ranged',
+        baseDamage: 6, attackSpeed: 2.0, range: 300, projectileSpeed: 14,
+        cost: 75, description: 'Bounces between enemies',
+        projectileColor: '#C0C0C0', animation: 'shuriken',
+        usesAmmo: false, spread: 0.05,
+        bounceCount: 3, bounceRange: 150,
+        tierMultipliers: {
+            damage: [1, 1.2, 1.4, 1.7, 2.0, 2.4],
+            attackSpeed: [1, 1.1, 1.2, 1.3, 1.4, 1.5],
+            bounceCount: [1, 1, 2, 2, 3, 4],
+            bounceRange: [1, 1.1, 1.2, 1.3, 1.4, 1.5]
+        }
+    },
+    {
         id: 'sniper', name: 'Sniper Rifle', icon: '🎯', type: 'ranged',
         baseDamage: 35, attackSpeed: 0.5, range: 500, projectileSpeed: 20,
         cost: 180, description: 'Long range, targets highest HP',
@@ -201,6 +215,20 @@ const WEAPON_DATA = [
             attackSpeed: [1, 1.1, 1.2, 1.3, 1.4, 1.5],
             pierceCount: [1, 1, 2, 2, 3, 4],
             range: [1, 1.1, 1.2, 1.3, 1.4, 1.5]
+        }
+    },
+    {
+        id: 'caltrops', name: 'Caltrops', icon: '🪤', type: 'ranged',
+        baseDamage: 20, attackSpeed: 2.0, range: 200, projectileSpeed: 0,
+        cost: 80, description: 'Throws caltrops on the ground dealing 20 dmg every 0.5s',
+        projectileColor: '#8B4513', animation: 'caltrops',
+        usesAmmo: false, spread: 0,
+        isCaltrops: true,
+        caltropRadius: 40, caltropDamage: 20, caltropInterval: 500,
+        tierMultipliers: {
+            damage: [1, 1.2, 1.4, 1.7, 2.0, 2.4],
+            attackSpeed: [1, 1.1, 1.2, 1.3, 1.4, 1.5],
+            caltropRadius: [1, 1.1, 1.2, 1.3, 1.4, 1.5]
         }
     }
 ];

@@ -65,23 +65,31 @@ const Boss = {
                 this.abilities.shotgun = true;
                 boss.color = '#8B0000';
                 boss.attackCooldown = 3500;
+                boss.radius = 35;
+                boss.hitboxRadius = boss.radius * CONFIG.HITBOX.BOSS;
                 break;
                 
             case 20:
                 this.abilities.weapon = { ...BOSS_WEAPONS.WAR_HAMMER, lastAttack: 0 };
                 boss.color = '#8B4513';
+                boss.radius = 40;
+                boss.hitboxRadius = boss.radius * CONFIG.HITBOX.BOSS;
                 this.startAsteroids();
                 break;
                 
             case 30:
                 this.abilities.weapon = { ...BOSS_WEAPONS.SCYTHE, lastAttack: 0 };
                 boss.color = '#4B0082';
+                boss.radius = 38;
+                boss.hitboxRadius = boss.radius * CONFIG.HITBOX.BOSS;
                 this.abilities.slowField = { active: true, radius: 200, lastDamage: 0 };
                 break;
                 
             case 40:
                 this.abilities.weapon = { ...BOSS_WEAPONS.VOID_BLADE, lastAttack: 0 };
                 boss.color = '#0f0f1f';
+                boss.radius = 45;
+                boss.hitboxRadius = boss.radius * CONFIG.HITBOX.BOSS;
                 this.startVoidZones();
                 break;
                 
@@ -90,9 +98,13 @@ const Boss = {
                 if (Game.sandboxMode && waveNum > 40 && waveNum % 10 === 0) {
                     this.abilities.weapon = { ...BOSS_WEAPONS.VOID_BLADE, lastAttack: 0 };
                     boss.color = '#6a0dad';
+                    boss.radius = 42;
+                    boss.hitboxRadius = boss.radius * CONFIG.HITBOX.BOSS;
                 }
                 break;
         }
+        
+        console.log(`👑 Boss setup for wave ${waveNum}: ${this.abilities.weapon ? this.abilities.weapon.name : 'None'}`);
     },
     
     // Start asteroid shower (wave 20)

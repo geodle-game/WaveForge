@@ -1,5 +1,5 @@
 // ============================================
-// WAVEFORGE - Monster Brain (AI System with Smooth A* Pathfinding)
+// WAVEFORGE - Monster Brain (Simple Wall Avoidance)
 // ============================================
 
 const MonsterBrain = {
@@ -11,193 +11,119 @@ const MonsterBrain = {
         SUPPORT: 'support'
     },
     
-    // A* Pathfinding grid
-    grid: null,
-    gridSize: 40,
-    gridCols: 0,
-    gridRows: 0,
-    
-    // Path cache to avoid recalculating every frame
-    pathRecalcInterval: 2000, // Recalculate path every 2 seconds instead of 1
-    
     init() {
         this.flocks.clear();
-        this.initGrid();
     },
     
     reset() {
         this.flocks.clear();
-        this.initGrid();
     },
     
-    // Initialize A* grid based on arena size
-    initGrid() {
-        const bounds = Arena.getBounds();
-        this.gridCols = Math.ceil((bounds.maxX - bounds.minX) / this.gridSize);
-        this.gridRows = Math.ceil((bounds.maxY - bounds.minY) / this.gridSize);
-        this.grid = new Array(this.gridCols * this.gridRows).fill(0);
+    // Check if there's a wall between two points
+    isWallBetween(x1, y1, x2, y2) {
+        const dx = x2 - x1;
+        const dy = y2 - y1;
+        const dist = Math.hypot(dx, dy);
+        const steps = Math.ceil(dist / 10);
         
-        // Mark walls in grid
-        for (let wall of Arena.walls) {
-            if (wall.destroyed) continue;
-            const minCol = Math.floor((wall.x - wall.width/2 - bounds.minX) / this.gridSize);
-            const maxCol = Math.floor((wall.x + wall.width/2 - bounds.minX) / this.gridSize);
-            const minRow = Math.floor((wall.y - wall.height/2 - bounds.minY) / this.gridSize);
-            const maxRow = Math.floor((wall.y + wall.height/2 - bounds.minY) / this.gridSize);
+        for (let i = 1; i < steps; i++) {
+            const t = i / steps;
+            const px = x1 + dx * t;
+            const py = y1 + dy * t;
             
-            for (let col = Math.max(0, minCol); col <= Math.min(this.gridCols - 1, maxCol); col++) {
-                for (let row = Math.max(0, minRow); row <= Math.min(this.gridRows - 1, maxRow); row++) {
-                    this.grid[row * this.gridCols + col] = 1; // 1 = blocked
+            for (let wall of Arena.walls) {
+                if (wall.destroyed) continue;
+                const halfW = wall.width / 2;
+                const halfH = wall.height / 2;
+                if (px >= wall.x - halfW && px <= wall.x + halfW &&
+                    py >= wall.y - halfH && py <= wall.y + halfH) {
+                    return true;
                 }
             }
         }
+        return false;
     },
     
-    // Convert world coordinates to grid coordinates
-    worldToGrid(x, y) {
-        const bounds = Arena.getBounds();
-        const col = Math.floor((x - bounds.minX) / this.gridSize);
-        const row = Math.floor((y - bounds.minY) / this.gridSize);
-        return { col: Math.max(0, Math.min(this.gridCols - 1, col)), 
-                 row: Math.max(0, Math.min(this.gridRows - 1, row)) };
-    },
-    
-    // Convert grid coordinates to world coordinates
-    gridToWorld(col, row) {
-        const bounds = Arena.getBounds();
-        return {
-            x: bounds.minX + (col + 0.5) * this.gridSize,
-            y: bounds.minY + (row + 0.5) * this.gridSize
-        };
-    },
-    
-    // Check if grid cell is walkable
-    isWalkable(col, row) {
-        if (col < 0 || col >= this.gridCols || row < 0 || row >= this.gridRows) return false;
-        return this.grid[row * this.gridCols + col] === 0;
-    },
-    
-    // A* Pathfinding algorithm
-    findPath(startX, startY, endX, endY) {
-        const start = this.worldToGrid(startX, startY);
-        const end = this.worldToGrid(endX, endY);
+    // Find a waypoint around a wall
+    findWaypointAroundWall(monster, targetX, targetY) {
+        const wall = this.findBlockingWall(monster.x, monster.y, targetX, targetY);
+        if (!wall) return null;
         
-        // If start or end is blocked, find nearest walkable
-        if (!this.isWalkable(start.col, start.row)) {
-            const nearest = this.findNearestWalkable(start.col, start.row);
-            if (!nearest) return null;
-            start.col = nearest.col;
-            start.row = nearest.row;
-        }
-        if (!this.isWalkable(end.col, end.row)) {
-            const nearest = this.findNearestWalkable(end.col, end.row);
-            if (!nearest) return null;
-            end.col = nearest.col;
-            end.row = nearest.row;
-        }
+        // Try to go around the wall - try different angles
+        const wallHalfW = wall.width / 2 + 20;
+        const wallHalfH = wall.height / 2 + 20;
         
-        // A* algorithm
-        const openSet = new Map();
-        const closedSet = new Set();
-        const cameFrom = new Map();
-        const gScore = new Map();
-        const fScore = new Map();
+        // Try 4 sides of the wall
+        const waypoints = [
+            { x: wall.x - wallHalfW - 10, y: wall.y },           // Left
+            { x: wall.x + wallHalfW + 10, y: wall.y },           // Right
+            { x: wall.x, y: wall.y - wallHalfH - 10 },           // Top
+            { x: wall.x, y: wall.y + wallHalfH + 10 },           // Bottom
+            { x: wall.x - wallHalfW - 10, y: wall.y - wallHalfH - 10 }, // Top-Left
+            { x: wall.x + wallHalfW + 10, y: wall.y - wallHalfH - 10 }, // Top-Right
+            { x: wall.x - wallHalfW - 10, y: wall.y + wallHalfH + 10 }, // Bottom-Left
+            { x: wall.x + wallHalfW + 10, y: wall.y + wallHalfH + 10 }  // Bottom-Right
+        ];
         
-        const startKey = `${start.col},${start.row}`;
-        const endKey = `${end.col},${end.row}`;
+        // Find the closest waypoint that has clear line of sight to both monster and target
+        let bestWaypoint = null;
+        let bestDist = Infinity;
         
-        openSet.set(startKey, { col: start.col, row: start.row });
-        gScore.set(startKey, 0);
-        fScore.set(startKey, this.heuristic(start.col, start.row, end.col, end.row));
-        
-        while (openSet.size > 0) {
-            // Find node with lowest fScore
-            let current = null;
-            let currentKey = null;
-            let lowestF = Infinity;
-            
-            for (let [key, node] of openSet) {
-                const f = fScore.get(key) || Infinity;
-                if (f < lowestF) {
-                    lowestF = f;
-                    current = node;
-                    currentKey = key;
+        for (let wp of waypoints) {
+            // Check if waypoint is inside any wall
+            let insideWall = false;
+            for (let w of Arena.walls) {
+                if (w.destroyed) continue;
+                const halfW = w.width / 2;
+                const halfH = w.height / 2;
+                if (wp.x >= w.x - halfW && wp.x <= w.x + halfW &&
+                    wp.y >= w.y - halfH && wp.y <= w.y + halfH) {
+                    insideWall = true;
+                    break;
                 }
             }
+            if (insideWall) continue;
             
-            if (currentKey === endKey) {
-                // Path found - reconstruct path
-                return this.reconstructPath(cameFrom, currentKey);
-            }
+            // Check line of sight from monster to waypoint
+            if (this.isWallBetween(monster.x, monster.y, wp.x, wp.y)) continue;
             
-            openSet.delete(currentKey);
-            closedSet.add(currentKey);
+            // Check line of sight from waypoint to target
+            if (this.isWallBetween(wp.x, wp.y, targetX, targetY)) continue;
             
-            // Check neighbors
-            const neighbors = [
-                { col: current.col + 1, row: current.row },
-                { col: current.col - 1, row: current.row },
-                { col: current.col, row: current.row + 1 },
-                { col: current.col, row: current.row - 1 },
-                { col: current.col + 1, row: current.row + 1 },
-                { col: current.col - 1, row: current.row - 1 },
-                { col: current.col + 1, row: current.row - 1 },
-                { col: current.col - 1, row: current.row + 1 }
-            ];
-            
-            for (let neighbor of neighbors) {
-                if (!this.isWalkable(neighbor.col, neighbor.row)) continue;
-                const neighborKey = `${neighbor.col},${neighbor.row}`;
-                if (closedSet.has(neighborKey)) continue;
-                
-                // Diagonal movement cost
-                const isDiagonal = neighbor.col !== current.col && neighbor.row !== current.row;
-                const tentativeG = (gScore.get(currentKey) || 0) + (isDiagonal ? 1.414 : 1);
-                
-                if (!openSet.has(neighborKey) || tentativeG < (gScore.get(neighborKey) || Infinity)) {
-                    cameFrom.set(neighborKey, currentKey);
-                    gScore.set(neighborKey, tentativeG);
-                    fScore.set(neighborKey, tentativeG + this.heuristic(neighbor.col, neighbor.row, end.col, end.row));
-                    openSet.set(neighborKey, neighbor);
-                }
+            // Calculate distance to monster
+            const dist = Math.hypot(wp.x - monster.x, wp.y - monster.y);
+            if (dist < bestDist) {
+                bestDist = dist;
+                bestWaypoint = wp;
             }
         }
         
-        // No path found
-        return null;
+        return bestWaypoint;
     },
     
-    // Heuristic function (Manhattan distance)
-    heuristic(col1, row1, col2, row2) {
-        return Math.abs(col1 - col2) + Math.abs(row1 - row2);
-    },
-    
-    // Find nearest walkable cell
-    findNearestWalkable(col, row) {
-        for (let radius = 1; radius < 5; radius++) {
-            for (let c = col - radius; c <= col + radius; c++) {
-                for (let r = row - radius; r <= row + radius; r++) {
-                    if (this.isWalkable(c, r)) {
-                        return { col: c, row: r };
-                    }
+    // Find the wall blocking the path
+    findBlockingWall(x1, y1, x2, y2) {
+        const dx = x2 - x1;
+        const dy = y2 - y1;
+        const dist = Math.hypot(dx, dy);
+        const steps = Math.ceil(dist / 10);
+        
+        for (let i = 1; i < steps; i++) {
+            const t = i / steps;
+            const px = x1 + dx * t;
+            const py = y1 + dy * t;
+            
+            for (let wall of Arena.walls) {
+                if (wall.destroyed) continue;
+                const halfW = wall.width / 2;
+                const halfH = wall.height / 2;
+                if (px >= wall.x - halfW && px <= wall.x + halfW &&
+                    py >= wall.y - halfH && py <= wall.y + halfH) {
+                    return wall;
                 }
             }
         }
         return null;
-    },
-    
-    // Reconstruct path from cameFrom map
-    reconstructPath(cameFrom, currentKey) {
-        const path = [];
-        let key = currentKey;
-        
-        while (key) {
-            const [col, row] = key.split(',').map(Number);
-            path.unshift(this.gridToWorld(col, row));
-            key = cameFrom.get(key);
-        }
-        
-        return path;
     },
     
     formFlocks() {
@@ -281,110 +207,61 @@ const MonsterBrain = {
         const flock = monster.flockId ? this.flocks.get(monster.flockId) : null;
         let moveX = 0, moveY = 0;
         
-        // Get or calculate path (recalculate every 2 seconds)
-        const now = Date.now();
+        // Direct movement towards player
+        moveX = player.x - monster.x;
+        moveY = player.y - monster.y;
         
-        if (monster._lastPathRecalc && now - monster._lastPathRecalc < this.pathRecalcInterval) {
-            // Use cached path if still valid
-            path = monster._currentPath;
-        } else {
-            // Calculate new path
-            path = this.findPath(monster.x, monster.y, player.x, player.y);
-            monster._currentPath = path;
-            monster._lastPathRecalc = now;
+        // Check if there's a wall blocking the direct path
+        if (this.isWallBetween(monster.x, monster.y, player.x, player.y)) {
+            const waypoint = this.findWaypointAroundWall(monster, player.x, player.y);
+            if (waypoint) {
+                moveX = waypoint.x - monster.x;
+                moveY = waypoint.y - monster.y;
+            }
         }
         
-        // Smooth path following - skip waypoints that are too close
-        if (path && path.length > 1) {
-            // Skip waypoints we've already passed
-            let nextIndex = 1;
-            while (nextIndex < path.length - 1) {
-                const waypoint = path[nextIndex];
-                const distToWaypoint = Math.hypot(waypoint.x - monster.x, waypoint.y - monster.y);
-                if (distToWaypoint < 30) {
-                    nextIndex++;
-                } else {
-                    break;
+        // Role-based modification
+        switch (monster.role) {
+            case this.roles.FLANKER:
+                const flankAngle = Math.atan2(player.y - monster.y, player.x - monster.x) + Math.PI / 3;
+                const flankDist = 150;
+                const flankTargetX = player.x + Math.cos(flankAngle) * flankDist;
+                const flankTargetY = player.y + Math.sin(flankAngle) * flankDist;
+                moveX = flankTargetX - monster.x;
+                moveY = flankTargetY - monster.y;
+                break;
+            case this.roles.BLOCKER:
+                const centerX = CONFIG.CANVAS_WIDTH / 2;
+                const centerY = CONFIG.CANVAS_HEIGHT / 2;
+                const blockAngle = Math.atan2(centerY - player.y, centerX - player.x);
+                const blockDist = 120;
+                const blockTargetX = player.x + Math.cos(blockAngle) * blockDist;
+                const blockTargetY = player.y + Math.sin(blockAngle) * blockDist;
+                moveX = blockTargetX - monster.x;
+                moveY = blockTargetY - monster.y;
+                break;
+            case this.roles.SUPPORT:
+                if (flock) {
+                    const supportAngle = Math.atan2(player.y - flock.center.y, player.x - flock.center.x) + Math.PI;
+                    const supportDist = 100;
+                    const supportTargetX = flock.center.x + Math.cos(supportAngle) * supportDist;
+                    const supportTargetY = flock.center.y + Math.sin(supportAngle) * supportDist;
+                    moveX = supportTargetX - monster.x;
+                    moveY = supportTargetY - monster.y;
                 }
-            }
-            
-            const nextWaypoint = path[nextIndex];
-            const dx = nextWaypoint.x - monster.x;
-            const dy = nextWaypoint.y - monster.y;
-            const dist = Math.hypot(dx, dy);
-            
-            // Only move if we're not at the waypoint
-            if (dist > 10) {
-                moveX = dx / dist;
-                moveY = dy / dist;
-            }
+                break;
         }
         
-        // If no path found or too close to waypoint, direct movement
-        if (moveX === 0 && moveY === 0) {
-            switch (monster.role) {
-                case this.roles.CHASER:
-                    moveX = player.x - monster.x;
-                    moveY = player.y - monster.y;
-                    break;
-                case this.roles.FLANKER:
-                    const flankAngle = Math.atan2(player.y - monster.y, player.x - monster.x) + Math.PI / 3;
-                    const flankDist = 150;
-                    const flankTargetX = player.x + Math.cos(flankAngle) * flankDist;
-                    const flankTargetY = player.y + Math.sin(flankAngle) * flankDist;
-                    moveX = flankTargetX - monster.x;
-                    moveY = flankTargetY - monster.y;
-                    break;
-                case this.roles.BLOCKER:
-                    const centerX = CONFIG.CANVAS_WIDTH / 2;
-                    const centerY = CONFIG.CANVAS_HEIGHT / 2;
-                    const blockAngle = Math.atan2(centerY - player.y, centerX - player.x);
-                    const blockDist = 120;
-                    const blockTargetX = player.x + Math.cos(blockAngle) * blockDist;
-                    const blockTargetY = player.y + Math.sin(blockAngle) * blockDist;
-                    moveX = blockTargetX - monster.x;
-                    moveY = blockTargetY - monster.y;
-                    break;
-                case this.roles.SUPPORT:
-                    if (flock) {
-                        const supportAngle = Math.atan2(player.y - flock.center.y, player.x - flock.center.x) + Math.PI;
-                        const supportDist = 100;
-                        const supportTargetX = flock.center.x + Math.cos(supportAngle) * supportDist;
-                        const supportTargetY = flock.center.y + Math.sin(supportAngle) * supportDist;
-                        moveX = supportTargetX - monster.x;
-                        moveY = supportTargetY - monster.y;
-                    } else {
-                        moveX = player.x - monster.x;
-                        moveY = player.y - monster.y;
-                    }
-                    break;
-                default:
-                    moveX = player.x - monster.x;
-                    moveY = player.y - monster.y;
-            }
-        }
-        
-        // Remove random variation to prevent jitter
-        // moveX += (Math.random() - 0.5) * 5;
-        // moveY += (Math.random() - 0.5) * 5;
-        
-        // Flocking behavior (with reduced force)
-        if (flock && flock.members.length > 1) {
-            const separationForce = this.getSeparationForce(monster, flock);
-            const cohesionForce = this.getCohesionForce(monster, flock);
-            moveX += separationForce.x * 0.2 + cohesionForce.x * 0.1;
-            moveY += separationForce.y * 0.2 + cohesionForce.y * 0.1;
-        }
-        
-        // Normalize movement
+        // Normalize
         const dist = Math.hypot(moveX, moveY);
         if (dist > 0) { moveX /= dist; moveY /= dist; }
         
-        // Wall avoidance
-        const testDist = 20;
+        // Simple wall sliding - if blocked, try sliding along wall
+        const testDist = 15;
         const testX = monster.x + moveX * testDist;
         const testY = monster.y + moveY * testDist;
         let blocked = false;
+        
         for (let wall of Arena.walls) {
             if (wall.destroyed) continue;
             const halfW = wall.width / 2;
@@ -395,18 +272,24 @@ const MonsterBrain = {
                 break;
             }
         }
+        
         if (blocked) {
+            // Try perpendicular directions (slide along wall)
             const alternatives = [
-                {x: 1, y: 0}, {x: -1, y: 0},
-                {x: 0, y: 1}, {x: 0, y: -1},
-                {x: 0.7, y: 0.7}, {x: -0.7, y: 0.7},
-                {x: 0.7, y: -0.7}, {x: -0.7, y: -0.7}
+                {x: moveY, y: -moveX},   // Perpendicular right
+                {x: -moveY, y: moveX},   // Perpendicular left
+                {x: 1, y: 0},
+                {x: -1, y: 0},
+                {x: 0, y: 1},
+                {x: 0, y: -1}
             ];
+            
             let found = false;
             for (let alt of alternatives) {
                 const altX = monster.x + alt.x * testDist;
                 const altY = monster.y + alt.y * testDist;
                 let altBlocked = false;
+                
                 for (let w of Arena.walls) {
                     if (w.destroyed) continue;
                     const hW = w.width / 2;
@@ -417,56 +300,35 @@ const MonsterBrain = {
                         break;
                     }
                 }
+                
                 if (!altBlocked) {
-                    moveX = alt.x;
-                    moveY = alt.y;
+                    const altDist = Math.hypot(alt.x, alt.y);
+                    moveX = alt.x / altDist;
+                    moveY = alt.y / altDist;
                     found = true;
                     break;
                 }
             }
-            if (!found) { moveX = 0; moveY = 0; }
+            
+            if (!found) {
+                moveX = 0;
+                moveY = 0;
+            }
         }
         
         // Boundary avoidance
         const bounds = Arena.getBounds();
-        const edgeMargin = 40;
-        if (monster.x < bounds.minX + edgeMargin) moveX += 0.3;
-        if (monster.x > bounds.maxX - edgeMargin) moveX -= 0.3;
-        if (monster.y < bounds.minY + edgeMargin) moveY += 0.3;
-        if (monster.y > bounds.maxY - edgeMargin) moveY -= 0.3;
+        const edgeMargin = 30;
+        if (monster.x < bounds.minX + edgeMargin) moveX += 0.5;
+        if (monster.x > bounds.maxX - edgeMargin) moveX -= 0.5;
+        if (monster.y < bounds.minY + edgeMargin) moveY += 0.5;
+        if (monster.y > bounds.maxY - edgeMargin) moveY -= 0.5;
         
         // Final normalization
         const finalDist = Math.hypot(moveX, moveY);
         if (finalDist > 0) { moveX /= finalDist; moveY /= finalDist; }
         
         return { x: moveX, y: moveY };
-    },
-    
-    getSeparationForce(monster, flock) {
-        let sx = 0, sy = 0;
-        const separationRadius = 40;
-        for (let other of flock.members) {
-            if (other === monster) continue;
-            const dx = monster.x - other.x;
-            const dy = monster.y - other.y;
-            const dist = Math.hypot(dx, dy);
-            if (dist < separationRadius && dist > 0) {
-                const force = (separationRadius - dist) / separationRadius;
-                sx += (dx / dist) * force;
-                sy += (dy / dist) * force;
-            }
-        }
-        return { x: sx, y: sy };
-    },
-    
-    getCohesionForce(monster, flock) {
-        const dx = flock.center.x - monster.x;
-        const dy = flock.center.y - monster.y;
-        const dist = Math.hypot(dx, dy);
-        if (dist > 80 && dist > 0) {
-            return { x: dx / dist, y: dy / dist };
-        }
-        return { x: 0, y: 0 };
     },
     
     onMonsterDeath(monster) {
@@ -482,20 +344,9 @@ const MonsterBrain = {
                 }
             }
         }
-        
-        // Clear path cache for dead monster
-        if (monster._currentPath) {
-            monster._currentPath = null;
-        }
     },
     
     update(currentTime) {
-        // Update A* grid periodically (walls might change)
-        if (!this._lastGridUpdate || currentTime - this._lastGridUpdate > 5000) {
-            this.initGrid();
-            this._lastGridUpdate = currentTime;
-        }
-        
         // Update flocks periodically
         if (!this._lastFlockUpdate || currentTime - this._lastFlockUpdate > 3000) {
             this.formFlocks();

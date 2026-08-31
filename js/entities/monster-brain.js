@@ -13,24 +13,20 @@ const MonsterBrain = {
     
     // A* Pathfinding grid
     grid: null,
-    gridSize: 40,  // Grid cell size
+    gridSize: 40,
     gridCols: 0,
     gridRows: 0,
     
     // Path cache to avoid recalculating every frame
-    pathCache: new Map(),
-    pathCacheMaxSize: 100,
-    pathRecalcInterval: 1000, // Recalculate path every 1 second
+    pathRecalcInterval: 2000, // Recalculate path every 2 seconds instead of 1
     
     init() {
         this.flocks.clear();
-        this.pathCache.clear();
         this.initGrid();
     },
     
     reset() {
         this.flocks.clear();
-        this.pathCache.clear();
         this.initGrid();
     },
     
@@ -204,25 +200,6 @@ const MonsterBrain = {
         return path;
     },
     
-    // Get cached path for monster
-    getCachedPath(monster) {
-        const cacheKey = `${monster.id || monster.type}_${Math.round(monster.x / 50)}_${Math.round(monster.y / 50)}_${Math.round(Player.entity.x / 50)}_${Math.round(Player.entity.y / 50)}`;
-        return this.pathCache.get(cacheKey);
-    },
-    
-    // Cache path for monster
-    cachePath(monster, path) {
-        const cacheKey = `${monster.id || monster.type}_${Math.round(monster.x / 50)}_${Math.round(monster.y / 50)}_${Math.round(Player.entity.x / 50)}_${Math.round(Player.entity.y / 50)}`;
-        
-        // Limit cache size
-        if (this.pathCache.size >= this.pathCacheMaxSize) {
-            const firstKey = this.pathCache.keys().next().value;
-            this.pathCache.delete(firstKey);
-        }
-        
-        this.pathCache.set(cacheKey, { path, timestamp: Date.now() });
-    },
-    
     formFlocks() {
         this.flocks.clear();
         const unassigned = [...Monsters.active];
@@ -304,9 +281,8 @@ const MonsterBrain = {
         const flock = monster.flockId ? this.flocks.get(monster.flockId) : null;
         let moveX = 0, moveY = 0;
         
-        // Get or calculate path (recalculate every ~1 second)
+        // Get or calculate path (recalculate every 2 seconds)
         const now = Date.now();
-        let path = null;
         
         if (monster._lastPathRecalc && now - monster._lastPathRecalc < this.pathRecalcInterval) {
             // Use cached path if still valid
@@ -338,7 +314,7 @@ const MonsterBrain = {
             const dist = Math.hypot(dx, dy);
             
             // Only move if we're not at the waypoint
-            if (dist > 5) {
+            if (dist > 10) {
                 moveX = dx / dist;
                 moveY = dy / dist;
             }
@@ -388,16 +364,16 @@ const MonsterBrain = {
             }
         }
         
-        // Reduce random variation to prevent jitter
-        moveX += (Math.random() - 0.5) * 5;
-        moveY += (Math.random() - 0.5) * 5;
+        // Remove random variation to prevent jitter
+        // moveX += (Math.random() - 0.5) * 5;
+        // moveY += (Math.random() - 0.5) * 5;
         
         // Flocking behavior (with reduced force)
         if (flock && flock.members.length > 1) {
             const separationForce = this.getSeparationForce(monster, flock);
             const cohesionForce = this.getCohesionForce(monster, flock);
-            moveX += separationForce.x * 0.3 + cohesionForce.x * 0.2;
-            moveY += separationForce.y * 0.3 + cohesionForce.y * 0.2;
+            moveX += separationForce.x * 0.2 + cohesionForce.x * 0.1;
+            moveY += separationForce.y * 0.2 + cohesionForce.y * 0.1;
         }
         
         // Normalize movement

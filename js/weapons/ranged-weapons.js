@@ -8,6 +8,8 @@ const RangedWeapons = {
             case 'shotgun': return this.createShotgun(weapon, playerX, playerY, angle, currentTime);
             case 'boomerang': return this.createBoomerang(weapon, playerX, playerY, angle, currentTime);
             case 'throwing_knives': return this.createThrowingKnife(weapon, playerX, playerY, angle, currentTime);
+            case 'shuriken': return this.createShuriken(weapon, playerX, playerY, angle, currentTime);
+            case 'caltrops': return this.createCaltrops(weapon, playerX, playerY, angle, currentTime);
             case 'sniper': return this.createSniper(weapon, playerX, playerY, angle, currentTime);
             case 'crossbow': return this.createCrossbow(weapon, playerX, playerY, angle, currentTime);
             case 'laser': return this.createLaser(weapon, playerX, playerY, angle, currentTime);
@@ -109,6 +111,51 @@ const RangedWeapons = {
     
     createThrowingKnife(weapon, x, y, angle, time) {
         return { type: 'ranged', x, y, angle: angle + (Math.random() - 0.5) * weapon.spread, speed: weapon.projectileSpeed, range: weapon.range, damage: weapon.baseDamage, color: weapon.projectileColor, weaponId: weapon.id, animation: 'knife', isThrowable: true, startTime: time, size: weapon.projectileSize || 6, spinSpeed: weapon.spinSpeed || 0, rotation: 0, weaponRef: weapon };
+    },
+    
+    createShuriken(weapon, x, y, angle, time) {
+        return { 
+            type: 'ranged', 
+            x, y, 
+            angle: angle + (Math.random() - 0.5) * weapon.spread, 
+            speed: weapon.projectileSpeed, 
+            range: weapon.range, 
+            damage: weapon.baseDamage, 
+            color: weapon.projectileColor, 
+            weaponId: weapon.id, 
+            animation: 'shuriken',
+            isShuriken: true,
+            bounceCount: weapon.bounceCount,
+            bounceRange: weapon.bounceRange,
+            targetsHit: [],
+            startTime: time, 
+            size: 5, 
+            spinSpeed: 0.3,
+            rotation: 0, 
+            weaponRef: weapon 
+        };
+    },
+    
+    createCaltrops(weapon, x, y, angle, time) {
+        return { 
+            type: 'ranged', 
+            x, y, 
+            angle: angle, 
+            speed: 0, 
+            range: weapon.range, 
+            damage: weapon.baseDamage,
+            color: weapon.projectileColor, 
+            weaponId: weapon.id, 
+            animation: 'caltrops',
+            isCaltrops: true,
+            caltropRadius: weapon.caltropRadius,
+            caltropDamage: weapon.caltropDamage,
+            caltropInterval: weapon.caltropInterval,
+            lastTick: 0,
+            startTime: time, 
+            size: 8, 
+            weaponRef: weapon 
+        };
     },
     
     createSniper(weapon, x, y, angle, time) {

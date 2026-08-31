@@ -45,8 +45,8 @@ const Game = {
 
             console.log('Initializing Camera...');
             this.camera.init();
-            this.camera.worldWidth = CONFIG.CANVAS_WIDTH;    // OLD SIZE - just 800
-            this.camera.worldHeight = CONFIG.CANVAS_HEIGHT;   // OLD SIZE - just 600
+            this.camera.worldWidth = CONFIG.CANVAS_WIDTH * 2;
+            this.camera.worldHeight = CONFIG.CANVAS_HEIGHT * 2;
 
             console.log('Initializing Player...');
             Player.init();
@@ -105,7 +105,11 @@ const Game = {
             console.log('All systems initialized successfully');
 
             this.setupKeyboard();
+
+            // Show start screen (don't start game loop until user clicks start)
             Overlays.showStart();
+
+            // Start game loop immediately - it will render the start screen
             this.gameLoop();
         } catch (e) {
             console.error('Game initialization error:', e);
@@ -136,6 +140,16 @@ const Game = {
             const deltaTime = currentTime - this.lastFrameTime;
             this.lastFrameTime = currentTime;
 
+            // Clear canvas every frame
+            this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
+
+            // If game is in START state, just show the start screen (don't update game logic)
+            if (this.state === GAME_STATE.START) {
+                // Don't update anything, just keep rendering
+                requestAnimationFrame(() => this.gameLoop());
+                return;
+            }
+
             // === Only update game logic if in WAVE state ===
             if (this.state === GAME_STATE.WAVE) {
                 Player.update(deltaTime);
@@ -153,25 +167,25 @@ const Game = {
                 Physics.resolvePlayerMonsterCollisions();
             }
 
-            // === Always render ===
-            this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
+            // === Always render (if in non-start states) ===
+            if (this.state !== GAME_STATE.START) {
+                if (Player.entity) {
+                    this.camera.follow(Player.entity);
+                }
 
-            if (Player.entity) {
-                this.camera.follow(Player.entity);
+                this.camera.apply(this.ctx);
+                Arena.draw();
+                Effects.drawGround();
+                Waves.drawIndicators();
+                Towers.draw();
+                Monsters.draw();
+                Projectiles.draw();
+                Combat.drawMeleeAttacks();
+                Boss.drawAttacks();
+                Effects.draw();
+                Player.draw();
+                this.camera.restore(this.ctx);
             }
-
-            this.camera.apply(this.ctx);
-            Arena.draw();
-            Effects.drawGround();
-            Waves.drawIndicators();
-            Towers.draw();
-            Monsters.draw();
-            Projectiles.draw();
-            Combat.drawMeleeAttacks();
-            Boss.drawAttacks();
-            Effects.draw();
-            Player.draw();
-            this.camera.restore(this.ctx);
 
             HUD.updateCooldowns();
         } catch (e) {

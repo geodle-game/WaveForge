@@ -197,7 +197,7 @@ const Boss = {
         
         for (let i = 0; i < projectileCount; i++) {
             const spreadAngle = angle + (i - (projectileCount - 1) / 2) * 0.3;
-            Projectiles.spawn({
+            Projectiles.bossProjectiles.push({
                 x: boss.x,
                 y: boss.y,
                 angle: spreadAngle,
@@ -205,8 +205,9 @@ const Boss = {
                 damage: weaponData.baseDamage * 0.5,
                 radius: 8,
                 color: boss.color,
+                startTime: Date.now(),
                 lifetime: 3000,
-                isBossProjectile: true
+                type: 'boss'
             });
         }
     },
@@ -494,3 +495,5 @@ const Boss = {
         ctx.restore();
     }
 };
+
+console.log('✅ Boss system loaded');

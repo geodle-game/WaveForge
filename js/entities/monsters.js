@@ -255,6 +255,16 @@ const Monsters = {
         if (index > -1) this.active.splice(index, 1);
     },
     
+    // Clean up any monsters with 0 HP
+    cleanupDeadMonsters() {
+        for (let i = this.active.length - 1; i >= 0; i--) {
+            const monster = this.active[i];
+            if (monster.health <= 0 && !monster._dead) {
+                this.handleDeath(monster, i);
+            }
+        }
+    },
+    
     handleDeath(monster, index) {
         if (monster._dead) return;
         monster._dead = true;
@@ -348,6 +358,10 @@ const Monsters = {
             if (currentTime - this.spawnIndicators[i].startTime > this.spawnIndicators[i].timer) 
                 this.spawnIndicators.splice(i, 1); 
         }
+        
+        // Clean up dead monsters
+        this.cleanupDeadMonsters();
+        
         for (let monster of this.active) { 
             if (monster.isDasher) this.updateDasher(monster, currentTime); 
         }

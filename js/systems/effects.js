@@ -74,7 +74,16 @@ const Effects = {
         this.add({ type: 'lightning', x1, y1, x2, y2, duration: 300 });
     },
     
+    // Convert world coordinates to screen coordinates
+    worldToScreen(x, y) {
+        if (typeof Camera !== 'undefined' && Camera) {
+            return { x: x - Camera.x, y: y - Camera.y };
+        }
+        return { x, y };
+    },
+    
     damageIndicator(x, y, damage, isCritical) {
+        const screenPos = this.worldToScreen(x, y);
         const indicator = document.createElement('div');
         indicator.className = 'damage-indicator';
         indicator.textContent = isCritical ? 'CRIT! ' + damage : Math.floor(damage).toString();
@@ -82,8 +91,8 @@ const Effects = {
             indicator.style.color = '#FFD700';
             indicator.style.fontSize = '1.5rem';
         }
-        indicator.style.left = (x + Math.random() * 20 - 10) + 'px';
-        indicator.style.top = (y + Math.random() * 20 - 10) + 'px';
+        indicator.style.left = (screenPos.x + Math.random() * 20 - 10) + 'px';
+        indicator.style.top = (screenPos.y + Math.random() * 20 - 10) + 'px';
         const container = document.querySelector('.canvas-container');
         if (container) {
             container.appendChild(indicator);
@@ -94,11 +103,12 @@ const Effects = {
     },
     
     goldPopup(x, y, amount) {
+        const screenPos = this.worldToScreen(x, y);
         const popup = document.createElement('div');
         popup.className = 'gold-popup';
         popup.textContent = '+' + amount + 'g';
-        popup.style.left = (x + Math.random() * 20 - 10) + 'px';
-        popup.style.top = (y + Math.random() * 20 - 10) + 'px';
+        popup.style.left = (screenPos.x + Math.random() * 20 - 10) + 'px';
+        popup.style.top = (screenPos.y + Math.random() * 20 - 10) + 'px';
         const container = document.querySelector('.canvas-container');
         if (container) {
             container.appendChild(popup);
@@ -109,11 +119,12 @@ const Effects = {
     },
     
     healthPopup(x, y, amount) {
+        const screenPos = this.worldToScreen(x, y);
         const popup = document.createElement('div');
         popup.className = 'health-popup';
         popup.textContent = '+' + amount + ' HP';
-        popup.style.left = (x + Math.random() * 20 - 10) + 'px';
-        popup.style.top = (y + Math.random() * 20 - 10) + 'px';
+        popup.style.left = (screenPos.x + Math.random() * 20 - 10) + 'px';
+        popup.style.top = (screenPos.y + Math.random() * 20 - 10) + 'px';
         const container = document.querySelector('.canvas-container');
         if (container) {
             container.appendChild(popup);
@@ -285,24 +296,6 @@ const Effects = {
                     }
                     ctx.stroke();
                     ctx.shadowBlur = 0;
-                    break;
-                    
-                case 'landmineSpawn':
-                    ctx.fillStyle = `rgba(139, 69, 19, ${alpha})`;
-                    ctx.shadowColor = '#8B4513';
-                    ctx.shadowBlur = 15 * alpha;
-                    ctx.beginPath();
-                    ctx.arc(effect.x, effect.y, effect.radius * (1 - progress), 0, Math.PI * 2);
-                    ctx.fill();
-                    break;
-                    
-                case 'towerSpawn':
-                    ctx.fillStyle = `rgba(76, 175, 80, ${alpha * 0.5})`;
-                    ctx.shadowColor = '#4CAF50';
-                    ctx.shadowBlur = 20 * alpha;
-                    ctx.beginPath();
-                    ctx.arc(effect.x, effect.y, effect.radius * (1 + progress), 0, Math.PI * 2);
-                    ctx.fill();
                     break;
             }
             

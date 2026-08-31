@@ -284,70 +284,23 @@ const Projectiles = {
             }
         }
         
-        // Armor Piercing (Machine Gun)
-        if (proj.weaponRef && proj.weaponRef.pierceCount > 1 && !proj.isBoomerang) {
-            proj.pierceCount = proj.weaponRef.pierceCount || 1;
+        // === PIERCING LOGIC (Crossbow & Machine Gun) ===
+        if (proj.weaponRef && proj.weaponRef.pierceCount > 1) {
+            // Initialize piercedEnemies array if not exists
             if (!proj.piercedEnemies) proj.piercedEnemies = [];
+            
+            // Add current monster to pierced list
             proj.piercedEnemies.push(monster);
             
-            if (proj.piercedEnemies.length >= proj.pierceCount) {
-                // Remove projectile after piercing enough enemies
+            // Check if we've pierced enough enemies
+            if (proj.piercedEnemies.length >= proj.weaponRef.pierceCount) {
+                // Enough piercing - remove projectile
                 this.active.splice(pi, 1);
             } else {
-                // Continue flying
-                proj.distanceTraveled = 0;
-                // Find next target
-                let nearest = null;
-                let nd = 150;
-                for (let k = 0; k < Monsters.active.length; k++) {
-                    if (k === mi || proj.piercedEnemies.includes(Monsters.active[k])) continue;
-                    const d = Physics.distance(monster, Monsters.active[k]);
-                    if (d < nd) {
-                        nd = d;
-                        nearest = Monsters.active[k];
-                    }
-                }
-                if (nearest) {
-                    proj.angle = Math.atan2(nearest.y - monster.y, nearest.x - monster.x);
-                    proj.x = monster.x;
-                    proj.y = monster.y;
-                } else {
-                    this.active.splice(pi, 1);
-                }
-            }
-        }
-        // Ricochet Blades (Throwing Knives)
-        else if (proj.weaponRef && proj.weaponRef.bounceCount > 0 && !proj.isBoomerang) {
-            if (!proj.bounceCount) proj.bounceCount = proj.weaponRef.bounceCount || 1;
-            if (!proj.bounceRange) proj.bounceRange = proj.weaponRef.bounceRange || 150;
-            if (!proj.targetsHit) proj.targetsHit = [];
-            
-            proj.targetsHit.push(monster);
-            proj.bounceCount--;
-            
-            if (proj.bounceCount <= 0) {
-                this.active.splice(pi, 1);
-            } else {
-                // Find next target to bounce to
-                let nearest = null;
-                let nd = proj.bounceRange || 150;
-                for (let k = 0; k < Monsters.active.length; k++) {
-                    if (k === mi || proj.targetsHit.includes(Monsters.active[k])) continue;
-                    const d = Physics.distance(monster, Monsters.active[k]);
-                    if (d < nd) {
-                        nd = d;
-                        nearest = Monsters.active[k];
-                    }
-                }
-                if (nearest) {
-                    proj.angle = Math.atan2(nearest.y - monster.y, nearest.x - monster.x);
-                    proj.x = monster.x;
-                    proj.y = monster.y;
-                    proj.distanceTraveled = 0;
-                    Messages.show(`Ricochet! Bounced to ${nearest.type}`, 1000);
-                } else {
-                    this.active.splice(pi, 1);
-                }
+                // Continue flying through - don't remove projectile
+                // Don't reset distanceTraveled - let it keep going
+                // But don't hit the same enemy again
+                proj.distanceTraveled = 0; // Reset to continue through more enemies
             }
         }
         // Regular projectile (no special effects)

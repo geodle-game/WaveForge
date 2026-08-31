@@ -11,7 +11,7 @@ const ITEM_DATA = [
     { id: 'healing_tower', name: 'Healing Tower', icon: '🏥', type: 'tower', cost: 50, maxPerGame: 3, description: 'Auto-deploys each wave, heals 1 HP/2s' },
     { id: 'landmine', name: 'Landmine', icon: '💥', type: 'tower', cost: 75, maxPerGame: 5, description: 'Deals 80 damage when triggered' },
     { id: 'turret', name: 'Turret', icon: '🔫', type: 'tower', cost: 80, maxPerGame: 3, description: 'Auto-targets enemies' },
-    { id: 'damage_orb', name: 'Damage Orb', icon: '💎', type: 'permanent', cost: 100, description: 'Permanently +15% damage' },
+    { id: 'damage_orb', name: 'Damage Orb', icon: '💎', type: 'permanent', cost: 1000, description: 'Permanently +15% damage' },
     { id: 'speed_boots', name: 'Speed Boots', icon: '👟', type: 'permanent', cost: 80, description: 'Permanently +15% speed' },
     { id: 'health_upgrade', name: 'Health Upgrade', icon: '🛡️', type: 'permanent', cost: 140, description: 'Permanently +25% max health' },
     { id: 'vampire_teeth', name: 'Vampire Teeth', icon: '🦷', type: 'permanent', cost: 320, description: 'Permanently +5% life steal', maxPurchases: 3 },

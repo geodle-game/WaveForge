@@ -80,6 +80,39 @@ const Combat = {
                 attackResults.push(weapon.attack(Player.entity.x, Player.entity.y, target.x, target.y));
             }
             
+            // === DOUBLE SHOT LOGIC (Global upgrade) ===
+            // Only if player has doubleShot upgrade and weapon is not a melee weapon
+            if (Player.doubleShot && weapon.type === 'ranged') {
+                // Check if we should fire a second shot based on interval
+                if (!weapon._lastDoubleShot || currentTime - weapon._lastDoubleShot >= 150) {
+                    // Create second projectile at slightly different angle
+                    const angle = Math.atan2(target.y - Player.entity.y, target.x - Player.entity.x);
+                    const spreadAngle = angle + 0.1; // Small spread
+                    const secondTarget = {
+                        x: Player.entity.x + Math.cos(spreadAngle) * weapon.range,
+                        y: Player.entity.y + Math.sin(spreadAngle) * weapon.range
+                    };
+                    const result = weapon.attack(Player.entity.x, Player.entity.y, secondTarget.x, secondTarget.y);
+                    
+                    if (Array.isArray(result)) {
+                        for (let proj of result) {
+                            proj.weaponRef = weapon;
+                            Projectiles.active.push(proj);
+                        }
+                    } else if (result && result.type === 'ranged') {
+                        result.weaponRef = weapon;
+                        Projectiles.active.push(result);
+                    }
+                    
+                    weapon._lastDoubleShot = currentTime;
+                    // Don't consume ammo for second shot (handled by weapon.attack already)
+                    // But we need to restore ammo since weapon.attack already consumed it
+                    if (weapon.usesAmmo && !weapon.isThrowable) {
+                        weapon.currentAmmo = Math.min(weapon.magazineSize, weapon.currentAmmo + 1);
+                    }
+                }
+            }
+            
             // Process attack results
             for (let result of attackResults) {
                 if (Array.isArray(result)) {

@@ -17,7 +17,7 @@ const Player = {
     baseSpeed: 3,
     speedMultiplier: 1.0,
     lifeSteal: 0,
-    lifeStealRemainder: 0,          // NEW: fractional lifesteal accumulator
+    lifeStealRemainder: 0,
     criticalChance: 0,
     goldMultiplier: 0,
     healthRegen: 0,
@@ -45,7 +45,11 @@ const Player = {
     // Upgrades
     knockback: false,
     explosiveKills: false,
-    goldMagnet: false,
+    fireImbue: false,
+    poisonImbue: false,
+    frostImbue: false,
+    piercingRounds: false,
+    doubleShot: false,
     
     // Input
     keys: { w: false, a: false, s: false, d: false, up: false, down: false, left: false, right: false },
@@ -106,7 +110,11 @@ const Player = {
         this.lastFacingAngle = 0;
         this.knockback = false;
         this.explosiveKills = false;
-        this.goldMagnet = false;
+        this.fireImbue = false;
+        this.poisonImbue = false;
+        this.frostImbue = false;
+        this.piercingRounds = false;
+        this.doubleShot = false;
         
         if (this.bloodContractInterval) {
             clearInterval(this.bloodContractInterval);
@@ -217,7 +225,7 @@ const Player = {
         
         if (this.berserkerRing) {
             const hpPercent = this.health / this.maxHealth;
-            this.damageMultiplier = 1.0 + (1 - hpPercent) * 0.5;
+            this.damageMultiplier = 1.0 + (1 - hpPercent) * 0.3;
         }
         
         HUD.updateStats();
@@ -268,15 +276,15 @@ const Player = {
         if (!consumable) return;
         
         switch (consumable.id) {
-            case 'health_potion': this.heal(Math.floor(this.maxHealth * 0.25)); break;
+            case 'health_potion': this.heal(Math.floor(this.maxHealth * CONFIG.CONSUMABLES.HEALTH_POTION_PERCENT)); break;
             case 'ammo_pack':
                 this.weapons.forEach(w => {
                     if (w.usesAmmo && !w.isThrowable) { w.currentAmmo = w.magazineSize; w.isReloading = false; }
                 });
                 break;
             case 'rage_potion':
-                this.damageMultiplier *= 1.5;
-                setTimeout(() => { this.damageMultiplier /= 1.5; }, 10000);
+                this.damageMultiplier *= CONFIG.CONSUMABLES.RAGE_POTION_DAMAGE_MULT;
+                setTimeout(() => { this.damageMultiplier /= CONFIG.CONSUMABLES.RAGE_POTION_DAMAGE_MULT; }, CONFIG.CONSUMABLES.RAGE_POTION_DURATION);
                 break;
             case 'bomb':
                 if (this.entity) {
@@ -298,6 +306,50 @@ const Player = {
                     weapon.tier++;
                     weapon.applyTierBonuses();
                     Messages.show(`${weapon.name} upgraded to Tier ${weapon.tier}!`);
+                }
+                break;
+            case 'speed_potion':
+                this.speedMultiplier *= CONFIG.CONSUMABLES.SPEED_POTION_SPEED_MULT;
+                this.speed = this.baseSpeed * this.speedMultiplier;
+                setTimeout(() => { this.speedMultiplier /= CONFIG.CONSUMABLES.SPEED_POTION_SPEED_MULT; this.speed = this.baseSpeed * this.speedMultiplier; }, CONFIG.CONSUMABLES.SPEED_POTION_DURATION);
+                break;
+            case 'shield_potion':
+                this.invulnerable = true;
+                setTimeout(() => { this.invulnerable = false; }, CONFIG.CONSUMABLES.SHIELD_POTION_DURATION);
+                break;
+            case 'fire_bomb':
+                if (this.entity) {
+                    Effects.groundFire(this.entity.x, this.entity.y, 100, CONFIG.CONSUMABLES.FIRE_BOMB_DAMAGE, CONFIG.CONSUMABLES.FIRE_BOMB_DURATION);
+                }
+                break;
+            case 'freeze_potion':
+                for (let m of Monsters.active) {
+                    m.frozen = true;
+                    m.frozenUntil = Date.now() + CONFIG.CONSUMABLES.FREEZE_POTION_DURATION;
+                    m.speed = 0;
+                }
+                break;
+            case 'poison_vial':
+                for (let m of Monsters.active) {
+                    m.poisoned = true;
+                    m.poisonDmg = CONFIG.CONSUMABLES.POISON_VIAL_DAMAGE;
+                    m.poisonEnd = Date.now() + CONFIG.CONSUMABLES.POISON_VIAL_DURATION;
+                }
+                break;
+            case 'spike_trap':
+                if (this.entity) {
+                    for (let i = 0; i < CONFIG.CONSUMABLES.SPIKE_TRAP_CALTRIPS; i++) {
+                        const angle = (i / CONFIG.CONSUMABLES.SPIKE_TRAP_CALTRIPS) * Math.PI * 2;
+                        const dist = 50;
+                        Projectiles.caltrops.push({
+                            x: this.entity.x + Math.cos(angle) * dist,
+                            y: this.entity.y + Math.sin(angle) * dist,
+                            radius: 40,
+                            damage: CONFIG.CONSUMABLES.SPIKE_TRAP_DAMAGE,
+                            interval: 500,
+                            lastTick: Date.now()
+                        });
+                    }
                 }
                 break;
         }
@@ -369,7 +421,7 @@ const Player = {
         ctx.fill();
         ctx.restore();
         
-        // === SPECIAL EFFECTS (Runic Plate, Blood Contract, Slow Field) ===
+        // === SPECIAL EFFECTS ===
         if (this.firstHitReduction && this.firstHitActive) {
             ctx.strokeStyle = '#0FF'; ctx.lineWidth = 3;
             ctx.shadowColor = '#0FF'; ctx.shadowBlur = 20;
@@ -400,7 +452,6 @@ const Player = {
         this.drawHealthBar(ctx);
     },
     
-    // === NEW: CUSTOM PLAYER HEALTH BAR ===
     drawHealthBar(ctx) {
         if (!this.entity) return;
         
@@ -410,13 +461,11 @@ const Player = {
         const height = 8;
         const hpPercent = Math.max(0, Math.min(1, this.health / this.maxHealth));
         
-        // Outer border with glow
         ctx.save();
         ctx.shadowColor = hpPercent > 0.5 ? 'rgba(0, 255, 0, 0.3)' : 
                          (hpPercent > 0.25 ? 'rgba(255, 200, 0, 0.3)' : 'rgba(255, 0, 0, 0.3)');
         ctx.shadowBlur = 10;
         
-        // Background (dark)
         ctx.fillStyle = 'rgba(0, 0, 0, 0.8)';
         ctx.strokeStyle = 'rgba(255, 255, 255, 0.3)';
         ctx.lineWidth = 1;
@@ -425,7 +474,6 @@ const Player = {
         ctx.fill();
         ctx.stroke();
         
-        // Health fill with gradient
         const gradient = ctx.createLinearGradient(x - width/2, y, x + width/2, y);
         if (hpPercent > 0.5) {
             gradient.addColorStop(0, '#00ff88');
@@ -443,19 +491,6 @@ const Player = {
         ctx.roundRect(x - width/2, y, width * hpPercent, height, 2);
         ctx.fill();
         
-        // Glow effect on the health bar
-        if (hpPercent > 0) {
-            ctx.shadowColor = hpPercent > 0.5 ? 'rgba(0, 255, 100, 0.5)' : 
-                             (hpPercent > 0.25 ? 'rgba(255, 200, 0, 0.5)' : 'rgba(255, 0, 0, 0.5)');
-            ctx.shadowBlur = 8;
-            ctx.fillStyle = 'rgba(255, 255, 255, 0.15)';
-            ctx.beginPath();
-            ctx.roundRect(x - width/2, y, width * hpPercent, height/2, 2);
-            ctx.fill();
-        }
-        ctx.shadowBlur = 0;
-        
-        // HP text
         ctx.fillStyle = '#fff';
         ctx.font = 'bold 9px Arial';
         ctx.textAlign = 'center';
@@ -464,15 +499,10 @@ const Player = {
         ctx.shadowBlur = 4;
         ctx.fillText(`${Math.floor(this.health)}/${this.maxHealth}`, x, y - 3);
         
-        // Heart icon
-        ctx.font = '10px Arial';
-        ctx.fillText('❤️', x - width/2 - 14, y + height - 1);
-        
         ctx.restore();
     }
 };
 
-// Helper: roundRect polyfill for older browsers
 if (!CanvasRenderingContext2D.prototype.roundRect) {
     CanvasRenderingContext2D.prototype.roundRect = function(x, y, w, h, r) {
         if (r > w/2) r = w/2;

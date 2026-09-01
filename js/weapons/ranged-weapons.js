@@ -9,6 +9,7 @@ const RangedWeapons = {
             case 'boomerang': return this.createBoomerang(weapon, playerX, playerY, angle, currentTime);
             case 'throwing_knives': return this.createThrowingKnife(weapon, playerX, playerY, angle, currentTime);
             case 'shuriken': return this.createShuriken(weapon, playerX, playerY, angle, currentTime);
+            case 'fan': return this.createFan(weapon, playerX, playerY, angle, currentTime);
             case 'caltrops': return this.createCaltrops(weapon, playerX, playerY, angle, currentTime);
             case 'sniper': return this.createSniper(weapon, playerX, playerY, angle, currentTime);
             case 'crossbow': return this.createCrossbow(weapon, playerX, playerY, angle, currentTime);
@@ -33,7 +34,6 @@ const RangedWeapons = {
             if (existing) return null;
         }
 
-        // Determine target position (nearest monster or aim direction)
         let targetX, targetY;
         if (Monsters.active.length > 0 && Player.entity) {
             let nearest = null, nd = Infinity;
@@ -53,7 +53,6 @@ const RangedWeapons = {
             targetY = y + Math.sin(angle) * weapon.range;
         }
 
-        // Build circular arc from player to target and back
         const px = x, py = y;
         const tx = targetX, ty = targetY;
         const midX = (px + tx) / 2, midY = (py + ty) / 2;
@@ -78,8 +77,7 @@ const RangedWeapons = {
         const angleStep = linearSpeed / radius;
 
         return {
-            type: 'ranged',
-            x, y,
+            type: 'ranged', x, y,
             startX: x, startY: y,
             angle: 0, speed: 0,
             range: weapon.range,
@@ -115,46 +113,62 @@ const RangedWeapons = {
     
     createShuriken(weapon, x, y, angle, time) {
         return { 
-            type: 'ranged', 
-            x, y, 
-            angle: angle + (Math.random() - 0.5) * weapon.spread, 
-            speed: weapon.projectileSpeed, 
-            range: weapon.range, 
-            damage: weapon.baseDamage, 
-            color: weapon.projectileColor, 
-            weaponId: weapon.id, 
+            type: 'ranged', x, y,
+            angle: angle + (Math.random() - 0.5) * weapon.spread,
+            speed: weapon.projectileSpeed,
+            range: weapon.range,
+            damage: weapon.baseDamage,
+            color: weapon.projectileColor,
+            weaponId: weapon.id,
             animation: 'shuriken',
             isShuriken: true,
             bounceCount: weapon.bounceCount,
             bounceRange: weapon.bounceRange,
             targetsHit: [],
-            startTime: time, 
-            size: 5, 
+            startTime: time,
+            size: 5,
             spinSpeed: 0.3,
-            rotation: 0, 
-            weaponRef: weapon 
+            rotation: 0,
+            weaponRef: weapon
+        };
+    },
+    
+    createFan(weapon, x, y, angle, time) {
+        return {
+            type: 'ranged', x, y,
+            angle: angle,
+            speed: weapon.projectileSpeed,
+            range: weapon.range,
+            damage: weapon.baseDamage,
+            color: '#87CEEB',
+            weaponId: weapon.id,
+            animation: 'wind',
+            isWind: true,
+            knockback: weapon.knockback || 15,
+            targetsHit: [],
+            startTime: time,
+            size: 10,
+            weaponRef: weapon
         };
     },
     
     createCaltrops(weapon, x, y, angle, time) {
         return { 
-            type: 'ranged', 
-            x, y, 
-            angle: angle, 
-            speed: 0, 
-            range: weapon.range, 
+            type: 'ranged', x, y,
+            angle: angle,
+            speed: weapon.projectileSpeed,
+            range: weapon.range,
             damage: weapon.baseDamage,
-            color: weapon.projectileColor, 
-            weaponId: weapon.id, 
+            color: weapon.projectileColor,
+            weaponId: weapon.id,
             animation: 'caltrops',
             isCaltrops: true,
             caltropRadius: weapon.caltropRadius,
             caltropDamage: weapon.caltropDamage,
             caltropInterval: weapon.caltropInterval,
-            lastTick: 0,
-            startTime: time, 
-            size: 8, 
-            weaponRef: weapon 
+            startTime: time,
+            size: 8,
+            weaponRef: weapon
         };
     },
     

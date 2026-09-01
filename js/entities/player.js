@@ -43,8 +43,6 @@ const Player = {
     lastFacingAngle: 0,
     
     // Upgrades
-    knockback: false,
-    explosiveKills: false,
     fireImbue: false,
     poisonImbue: false,
     frostImbue: false,
@@ -108,8 +106,6 @@ const Player = {
         this.lastRegen = Date.now();
         this.facingAngle = 0;
         this.lastFacingAngle = 0;
-        this.knockback = false;
-        this.explosiveKills = false;
         this.fireImbue = false;
         this.poisonImbue = false;
         this.frostImbue = false;
@@ -288,38 +284,47 @@ const Player = {
                 break;
             case 'bomb':
                 if (this.entity) {
-                    Effects.explosion(this.entity.x, this.entity.y, 150, '#FF4500');
-                    for (let i = Monsters.active.length - 1; i >= 0; i--) {
-                        const m = Monsters.active[i];
-                        if (Physics.distance(this.entity, m) < 150 + m.radius) {
-                            m.health -= 100;
-                            Effects.damageIndicator(m.x, m.y, 100, true);
-                            if (m.health <= 0) Monsters.handleDeath(m, i);
+                    // Place bomb at player position
+                    const bombX = this.entity.x;
+                    const bombY = this.entity.y;
+                    
+                    // Show bomb placement
+                    Effects.add({ type: 'bombPlace', x: bombX, y: bombY, radius: 20, duration: 3000 });
+                    
+                    // 3 second countdown then explode
+                    setTimeout(() => {
+                        if (Game.state !== GAME_STATE.WAVE) return;
+                        Effects.explosion(bombX, bombY, 150, '#FF4500');
+                        for (let i = Monsters.active.length - 1; i >= 0; i--) {
+                            const m = Monsters.active[i];
+                            if (Physics.distance({x: bombX, y: bombY}, m) < 150 + m.radius) {
+                                m.health -= 100;
+                                Effects.damageIndicator(m.x, m.y, 100, true);
+                                if (m.health <= 0) Monsters.handleDeath(m, i);
+                            }
                         }
-                    }
+                        // Also damage player if too close
+                        if (Player.entity && Physics.distance({x: bombX, y: bombY}, Player.entity) < 100) {
+                            Player.takeDamage(20);
+                        }
+                    }, 3000);
+                    
+                    Messages.show('Bomb placed! 3 seconds...', 2000);
                 }
-                break;
-            case 'exp_scroll':
-                const upgradable = this.weapons.filter(w => w.tier < 5);
-                if (upgradable.length > 0) {
-                    const weapon = upgradable[Math.floor(Math.random() * upgradable.length)];
-                    weapon.tier++;
-                    weapon.applyTierBonuses();
-                    Messages.show(`${weapon.name} upgraded to Tier ${weapon.tier}!`);
-                }
-                break;
-            case 'speed_potion':
-                this.speedMultiplier *= CONFIG.CONSUMABLES.SPEED_POTION_SPEED_MULT;
-                this.speed = this.baseSpeed * this.speedMultiplier;
-                setTimeout(() => { this.speedMultiplier /= CONFIG.CONSUMABLES.SPEED_POTION_SPEED_MULT; this.speed = this.baseSpeed * this.speedMultiplier; }, CONFIG.CONSUMABLES.SPEED_POTION_DURATION);
-                break;
-            case 'shield_potion':
-                this.invulnerable = true;
-                setTimeout(() => { this.invulnerable = false; }, CONFIG.CONSUMABLES.SHIELD_POTION_DURATION);
                 break;
             case 'fire_bomb':
                 if (this.entity) {
-                    Effects.groundFire(this.entity.x, this.entity.y, 100, CONFIG.CONSUMABLES.FIRE_BOMB_DAMAGE, CONFIG.CONSUMABLES.FIRE_BOMB_DURATION);
+                    // Place fire bomb at player position
+                    const fbX = this.entity.x;
+                    const fbY = this.entity.y;
+                    
+                    // Show fire bomb placement
+                    Effects.add({ type: 'fireBombPlace', x: fbX, y: fbY, radius: 30, duration: 500 });
+                    
+                    // Create fire on ground
+                    Effects.groundFire(fbX, fbY, 100, CONFIG.CONSUMABLES.FIRE_BOMB_DAMAGE, CONFIG.CONSUMABLES.FIRE_BOMB_DURATION);
+                    
+                    Messages.show('Fire bomb deployed!', 1500);
                 }
                 break;
             case 'freeze_potion':
@@ -351,6 +356,24 @@ const Player = {
                         });
                     }
                 }
+                break;
+            case 'exp_scroll':
+                const upgradable = this.weapons.filter(w => w.tier < 5);
+                if (upgradable.length > 0) {
+                    const weapon = upgradable[Math.floor(Math.random() * upgradable.length)];
+                    weapon.tier++;
+                    weapon.applyTierBonuses();
+                    Messages.show(`${weapon.name} upgraded to Tier ${weapon.tier}!`);
+                }
+                break;
+            case 'speed_potion':
+                this.speedMultiplier *= CONFIG.CONSUMABLES.SPEED_POTION_SPEED_MULT;
+                this.speed = this.baseSpeed * this.speedMultiplier;
+                setTimeout(() => { this.speedMultiplier /= CONFIG.CONSUMABLES.SPEED_POTION_SPEED_MULT; this.speed = this.baseSpeed * this.speedMultiplier; }, CONFIG.CONSUMABLES.SPEED_POTION_DURATION);
+                break;
+            case 'shield_potion':
+                this.invulnerable = true;
+                setTimeout(() => { this.invulnerable = false; }, CONFIG.CONSUMABLES.SHIELD_POTION_DURATION);
                 break;
         }
         

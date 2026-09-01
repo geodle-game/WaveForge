@@ -15,7 +15,17 @@ const Towers = {
     },
     turrets: {
         count: 0,
-        max: 3,
+        max: CONFIG.MAX_TURRETS,
+        active: []
+    },
+    frostTowers: {
+        count: 0,
+        max: CONFIG.MAX_FROST_TOWERS,
+        active: []
+    },
+    poisonTowers: {
+        count: 0,
+        max: CONFIG.MAX_POISON_TOWERS,
         active: []
     },
     
@@ -26,27 +36,36 @@ const Towers = {
         this.healingTowers.active = [];
         this.turrets.count = 0;
         this.turrets.active = [];
+        this.frostTowers.count = 0;
+        this.frostTowers.active = [];
+        this.poisonTowers.count = 0;
+        this.poisonTowers.active = [];
     },
     
     reset() {
         this.landmines.active = [];
         this.healingTowers.active = [];
         this.turrets.active = [];
+        this.frostTowers.active = [];
+        this.poisonTowers.active = [];
     },
     
     // Spawn all deployed towers at wave start
     deployAll() {
-        // Deploy landmines
         for (let i = 0; i < this.landmines.count; i++) {
             setTimeout(() => this.spawnLandmine(), i * 200);
         }
-        // Deploy healing towers
         for (let i = 0; i < this.healingTowers.count; i++) {
             setTimeout(() => this.spawnHealingTower(), i * 200 + 500);
         }
-        // Deploy turrets
         for (let i = 0; i < this.turrets.count; i++) {
             setTimeout(() => this.spawnTurret(), i * 200 + 1000);
+        }
+        for (let i = 0; i < this.frostTowers.count; i++) {
+            setTimeout(() => this.spawnFrostTower(), i * 200 + 1500);
+        }
+        for (let i = 0; i < this.poisonTowers.count; i++) {
+            setTimeout(() => this.spawnPoisonTower(), i * 200 + 2000);
         }
     },
     
@@ -73,8 +92,8 @@ const Towers = {
         }
         
         this.landmines.active.push({
-            x, y, radius: 15, damage: 80,
-            explosionRadius: 60, active: true,
+            x, y, radius: 15, damage: CONFIG.LANDMINE_DAMAGE,
+            explosionRadius: CONFIG.LANDMINE_RADIUS, active: true,
             startTime: Date.now(), color: '#8B4513'
         });
     },
@@ -103,8 +122,9 @@ const Towers = {
         
         this.turrets.active.push({
             x, y, radius: 20, health: 30,
-            damage: 7, range: 300,
-            attackSpeed: 1.0,
+            damage: CONFIG.TURRET_DAMAGE,
+            range: CONFIG.TURRET_RANGE,
+            attackSpeed: CONFIG.TURRET_ATTACK_SPEED,
             lastAttack: 0,
             projectileColor: '#FFD700',
             projectileSpeed: 10,
@@ -112,7 +132,40 @@ const Towers = {
         });
     },
     
-    // Purchase a tower (increments count, deployed next wave)
+    spawnFrostTower() {
+        if (!Player.entity) return;
+        const angle = Math.random() * Math.PI * 2;
+        const dist = 80 + Math.random() * 120;
+        const x = Player.entity.x + Math.cos(angle) * dist;
+        const y = Player.entity.y + Math.sin(angle) * dist;
+        
+        this.frostTowers.active.push({
+            x, y, radius: 20, health: 30,
+            slowPercent: CONFIG.FROST_TOWER_SLOW_PERCENT,
+            radius: CONFIG.FROST_TOWER_RADIUS,
+            interval: CONFIG.FROST_TOWER_INTERVAL,
+            lastSlow: Date.now(),
+            id: Date.now() + Math.random()
+        });
+    },
+    
+    spawnPoisonTower() {
+        if (!Player.entity) return;
+        const angle = Math.random() * Math.PI * 2;
+        const dist = 80 + Math.random() * 120;
+        const x = Player.entity.x + Math.cos(angle) * dist;
+        const y = Player.entity.y + Math.sin(angle) * dist;
+        
+        this.poisonTowers.active.push({
+            x, y, radius: 20, health: 30,
+            damage: CONFIG.POISON_TOWER_DAMAGE,
+            radius: CONFIG.POISON_TOWER_RADIUS,
+            interval: CONFIG.POISON_TOWER_INTERVAL,
+            lastPoison: Date.now(),
+            id: Date.now() + Math.random()
+        });
+    },
+    
     purchaseTower(type) {
         switch (type) {
             case 'landmine':
@@ -129,6 +182,16 @@ const Towers = {
                 if (this.turrets.count >= this.turrets.max) return false;
                 this.turrets.count++;
                 if (Game.state === GAME_STATE.WAVE) this.spawnTurret();
+                return true;
+            case 'frost_tower':
+                if (this.frostTowers.count >= this.frostTowers.max) return false;
+                this.frostTowers.count++;
+                if (Game.state === GAME_STATE.WAVE) this.spawnFrostTower();
+                return true;
+            case 'poison_tower':
+                if (this.poisonTowers.count >= this.poisonTowers.max) return false;
+                this.poisonTowers.count++;
+                if (Game.state === GAME_STATE.WAVE) this.spawnPoisonTower();
                 return true;
         }
         return false;
@@ -160,7 +223,6 @@ const Towers = {
         for (let turret of this.turrets.active) {
             if (currentTime - turret.lastAttack < 1000 / turret.attackSpeed) continue;
             
-            // Find nearest monster in range
             let target = null;
             let nearestDist = turret.range;
             for (let monster of Monsters.active) {
@@ -174,7 +236,7 @@ const Towers = {
             if (target) {
                 turret.lastAttack = currentTime;
                 const angle = Math.atan2(target.y - turret.y, target.x - turret.x);
-                Projectiles.active.push({
+                Projectiles.spawn({
                     x: turret.x, y: turret.y,
                     angle: angle,
                     speed: turret.projectileSpeed,
@@ -190,11 +252,42 @@ const Towers = {
         }
     },
     
+    updateFrostTowers(currentTime) {
+        for (let tower of this.frostTowers.active) {
+            if (currentTime - tower.lastSlow >= tower.interval) {
+                for (let monster of Monsters.active) {
+                    if (Physics.distance(tower, monster) < tower.radius + monster.radius) {
+                        monster.slowed = true;
+                        monster.slowUntil = Date.now() + tower.interval;
+                        monster.speed = monster.originalSpeed * (1 - tower.slowPercent);
+                    }
+                }
+                tower.lastSlow = currentTime;
+            }
+        }
+    },
+    
+    updatePoisonTowers(currentTime) {
+        for (let tower of this.poisonTowers.active) {
+            if (currentTime - tower.lastPoison >= tower.interval) {
+                for (let monster of Monsters.active) {
+                    if (Physics.distance(tower, monster) < tower.radius + monster.radius) {
+                        monster.poisoned = true;
+                        monster.poisonDmg = tower.damage;
+                        monster.poisonEnd = Date.now() + tower.interval;
+                    }
+                }
+                tower.lastPoison = currentTime;
+            }
+        }
+    },
+    
     update(currentTime) {
         this.checkLandmineTriggers();
         this.updateTurrets(currentTime);
+        this.updateFrostTowers(currentTime);
+        this.updatePoisonTowers(currentTime);
         
-        // Healing towers
         for (let tower of this.healingTowers.active) {
             if (currentTime - tower.lastHeal >= CONFIG.HEALING_TOWER_INTERVAL && 
                 Player.health < Player.maxHealth) {
@@ -248,19 +341,49 @@ const Towers = {
             ctx.fillRect(-10, -10, 20, 20);
             ctx.fillStyle = '#333';
             ctx.beginPath(); ctx.arc(0, 0, 8, 0, Math.PI * 2); ctx.fill();
-            // Gun barrel
             const angle = Monsters.active.length > 0 ? 
                 Math.atan2(Monsters.active[0].y - turret.y, Monsters.active[0].x - turret.x) : 0;
             ctx.save(); ctx.rotate(angle);
             ctx.fillStyle = '#444';
             ctx.fillRect(8, -3, 15, 6);
             ctx.restore();
-            // Health bar
             const hpPercent = turret.health / 30;
             ctx.fillStyle = '#000';
             ctx.fillRect(-turret.radius, -turret.radius - 10, turret.radius * 2, 5);
             ctx.fillStyle = '#0F0';
             ctx.fillRect(-turret.radius, -turret.radius - 10, turret.radius * 2 * hpPercent, 5);
+            ctx.restore();
+        }
+        
+        // Frost towers
+        for (let tower of this.frostTowers.active) {
+            ctx.save();
+            ctx.translate(tower.x, tower.y);
+            ctx.fillStyle = '#1E90FF'; ctx.shadowColor = '#00BFFF'; ctx.shadowBlur = 15;
+            ctx.beginPath(); ctx.arc(0, 0, tower.radius, 0, Math.PI * 2); ctx.fill();
+            ctx.fillStyle = '#FFF'; ctx.font = 'bold 16px Arial';
+            ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText('❄', 0, 0);
+            
+            // Draw radius
+            ctx.strokeStyle = 'rgba(30,144,255,0.3)';
+            ctx.lineWidth = 1;
+            ctx.beginPath(); ctx.arc(0, 0, tower.radius, 0, Math.PI * 2); ctx.stroke();
+            ctx.restore();
+        }
+        
+        // Poison towers
+        for (let tower of this.poisonTowers.active) {
+            ctx.save();
+            ctx.translate(tower.x, tower.y);
+            ctx.fillStyle = '#4B0082'; ctx.shadowColor = '#8B008B'; ctx.shadowBlur = 15;
+            ctx.beginPath(); ctx.arc(0, 0, tower.radius, 0, Math.PI * 2); ctx.fill();
+            ctx.fillStyle = '#00FF00'; ctx.font = 'bold 16px Arial';
+            ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText('☠', 0, 0);
+            
+            // Draw radius
+            ctx.strokeStyle = 'rgba(75,0,130,0.3)';
+            ctx.lineWidth = 1;
+            ctx.beginPath(); ctx.arc(0, 0, tower.radius, 0, Math.PI * 2); ctx.stroke();
             ctx.restore();
         }
     }

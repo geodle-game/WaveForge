@@ -98,6 +98,20 @@ const WEAPON_DATA = [
         }
     },
     {
+        id: 'fan', name: 'Fan', icon: '🪭', type: 'ranged',
+        baseDamage: 4, attackSpeed: 1.5, range: 200, projectileSpeed: 8,
+        cost: 70, description: 'Gust of wind with knockback',
+        projectileColor: '#87CEEB', animation: 'wind',
+        usesAmmo: false, spread: 0.1,
+        isWind: true, knockback: 15,
+        tierMultipliers: {
+            damage: [1, 1.2, 1.4, 1.7, 2.0, 2.4],
+            attackSpeed: [1, 1.1, 1.2, 1.3, 1.4, 1.5],
+            knockback: [1, 1.1, 1.2, 1.3, 1.4, 1.5],
+            range: [1, 1.1, 1.2, 1.3, 1.4, 1.5]
+        }
+    },
+    {
         id: 'sniper', name: 'Sniper Rifle', icon: '🎯', type: 'ranged',
         baseDamage: 35, attackSpeed: 0.5, range: 500, projectileSpeed: 20,
         cost: 180, description: 'Long range, targets highest HP',

@@ -123,6 +123,20 @@ const WEAPON_DATA = [
             pierceCount: [1, 2, 2, 3, 3, 4]
         }
     },
+    {
+        id: 'caltrops', name: 'Caltrops', icon: '🪤', type: 'ranged',
+        baseDamage: 20, attackSpeed: 0.5, range: 200, projectileSpeed: 10,
+        cost: 80, description: 'Throws caltrops on the ground dealing 20 dmg every 0.5s',
+        projectileColor: '#8B4513', animation: 'caltrops',
+        usesAmmo: true, magazineSize: 1, reloadTime: 2000, spread: 0,
+        isCaltrops: true,
+        caltropRadius: 40, caltropDamage: 20, caltropInterval: 500,
+        tierMultipliers: {
+            damage: [1, 1.2, 1.4, 1.7, 2.0, 2.4],
+            attackSpeed: [1, 1.1, 1.2, 1.3, 1.4, 1.5],
+            caltropRadius: [1, 1.1, 1.2, 1.3, 1.4, 1.5]
+        }
+    },
     
     // === MELEE WEAPONS ===
     {
@@ -205,30 +219,16 @@ const WEAPON_DATA = [
         swingColor: '#CD7F32', swingAngle: 45,
         trailColor: '#50C878', sparkleColor: '#FFD700',
         prongColor: '#CD7F32', shaftColor: '#8B4513', tipColor: '#FFD700',
-        usesAmmo: true,            // <-- now uses ammo for the throw
-        magazineSize: 1,           // one throw
-        resetEachRound: true,      // ammo resets each wave
+        usesAmmo: true,
+        magazineSize: 1,
+        resetEachRound: true,
         pierceCount: 3,
-        pickupRange: 80,           // larger pickup range
+        pickupRange: 80,
         tierMultipliers: {
             damage: [1, 1.3, 1.6, 2.0, 2.5, 3.0],
             attackSpeed: [1, 1.1, 1.2, 1.3, 1.4, 1.5],
             pierceCount: [1, 1, 2, 2, 3, 4],
             range: [1, 1.1, 1.2, 1.3, 1.4, 1.5]
-        }
-    },
-    {
-        id: 'caltrops', name: 'Caltrops', icon: '🪤', type: 'ranged',
-        baseDamage: 20, attackSpeed: 2.0, range: 200, projectileSpeed: 0,
-        cost: 80, description: 'Throws caltrops on the ground dealing 20 dmg every 0.5s',
-        projectileColor: '#8B4513', animation: 'caltrops',
-        usesAmmo: false, spread: 0,
-        isCaltrops: true,
-        caltropRadius: 40, caltropDamage: 20, caltropInterval: 500,
-        tierMultipliers: {
-            damage: [1, 1.2, 1.4, 1.7, 2.0, 2.4],
-            attackSpeed: [1, 1.1, 1.2, 1.3, 1.4, 1.5],
-            caltropRadius: [1, 1.1, 1.2, 1.3, 1.4, 1.5]
         }
     }
 ];

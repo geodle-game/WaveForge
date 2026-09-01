@@ -18,6 +18,21 @@ const Upgrades = {
             options.push(shuffled[i]);
         }
         
+        // Add abilities (30% chance to offer)
+        const abilityDefinitions = Object.values(Abilities.definitions);
+        const availableAbilities = abilityDefinitions.filter(a => !Abilities.owned.some(owned => owned.id === a.id));
+        if (availableAbilities.length > 0 && Math.random() < 0.3) {
+            const ability = availableAbilities[Math.floor(Math.random() * availableAbilities.length)];
+            options.push({
+                id: 'ability_' + ability.id,
+                name: ability.name,
+                description: ability.description,
+                icon: ability.icon,
+                isAbility: true,
+                abilityId: ability.id
+            });
+        }
+        
         // Select 4 random options
         this.currentOptions = [];
         for (let i = 0; i < 4; i++) {
@@ -68,13 +83,16 @@ const Upgrades = {
     
     // Apply selected upgrade
     selectUpgrade(buff) {
-        if (buff.weaponId) {
+        if (buff.isAbility) {
+            // Add ability to player
+            Abilities.addAbility(buff.abilityId);
+            Messages.show(`New Ability: ${buff.name}!`);
+        } else if (buff.weaponId) {
             this.applyWeaponUpgrade(buff);
         } else {
             this.applyStatBuff(buff);
         }
         
-        // Show appropriate message
         let message = `Selected: ${buff.name}`;
         if (buff.weaponId) {
             const weapon = Player.getWeaponById(buff.weaponId);
@@ -122,7 +140,6 @@ const Upgrades = {
     applyWeaponUpgradeSilent(upgrade, weapon) {
         const e = upgrade.effect;
         
-        // Melee upgrades
         if (e.poisonDamage) { 
             weapon.poisonDamage = e.poisonDamage; 
             weapon.poisonDuration = e.poisonDuration; 
@@ -139,7 +156,6 @@ const Upgrades = {
         if (e.critChance) Player.criticalChance += e.critChance;
         if (e.stunDuration) weapon.stunDuration = e.stunDuration;
         
-        // Spear/Trident upgrades
         if (e.returningWeapon) {
             weapon.isThrowable = true;
             weapon.returnSpeed = 12;
@@ -151,12 +167,10 @@ const Upgrades = {
         if (e.lightningStrike) weapon.lightningStrike = true;
         if (e.removePierce) weapon.pierceCount = 1;
         
-        // Ranged upgrades
         if (e.pelletCount) weapon.pelletCount = e.pelletCount;
         if (e.spreadAngle) weapon.spreadAngle = e.spreadAngle;
         if (e.spreadMult) weapon.spreadAngle = Math.floor(weapon.spreadAngle * e.spreadMult);
         
-        // Shotgun specific
         if (e.slugMode) { 
             weapon.slugMode = true;
             weapon.pelletCount = 1; 
@@ -165,23 +179,18 @@ const Upgrades = {
         }
         if (e.chokeMod) weapon.chokeMod = true;
         
-        // Machine Gun specific
         if (e.pierceCount) weapon.pierceCount = e.pierceCount;
         
-        // Laser specific
         if (e.forkLaser) weapon.forkLaser = true;
         
-        // Boomerang specific
         if (e.doubleThrow) weapon.doubleThrow = true;
         if (e.orbitalMode) weapon.orbitalMode = true;
         
-        // Throwing Knives specific
         if (e.bounceCount) { 
             weapon.bounceCount = e.bounceCount; 
             weapon.bounceRange = e.bounceRange; 
         }
         
-        // Sniper and Crossbow specific
         if (e.explosiveShot) { 
             weapon.explosiveShot = true; 
             weapon.explosiveDamage = e.explosiveDamage; 
@@ -189,13 +198,11 @@ const Upgrades = {
         }
         if (e.tripleShot) weapon.tripleShot = true;
         
-        // Handgun specific
         if (e.doubleTap) weapon.doubleTap = true;
     },
     
     // Apply weapon upgrade (with message)
     applyWeaponUpgrade(upgrade) {
-        // Store the upgrade globally so future merges/new weapons can apply it
         Game.weaponUpgrades[upgrade.weaponId] = upgrade.id;
         const weapon = Player.getWeaponById(upgrade.weaponId);
         if (!weapon) return;

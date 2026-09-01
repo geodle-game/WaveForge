@@ -79,7 +79,7 @@ const Projectiles = {
         for (let i = this.active.length - 1; i >= 0; i--) {
             const proj = this.active[i];
             
-            // Caltrops are placed on ground, not moving projectiles
+            // Caltrops are placed on ground
             if (proj.isCaltrops) {
                 this.placeCaltrops(proj, i);
                 continue;
@@ -122,7 +122,7 @@ const Projectiles = {
     },
     
     placeCaltrops(proj, index) {
-        if (this.caltrops.length < 10) {
+        if (this.caltrops.length < 5) {
             this.caltrops.push({
                 x: proj.x,
                 y: proj.y,
@@ -165,6 +165,7 @@ const Projectiles = {
                 this.applyProjectileDamage(proj, m, j, index);
                 proj.targetsHit.push(m);
                 
+                // BOUNCE to next target - don't go through
                 if (proj.bounceCount > 0) {
                     let nearest = null;
                     let nd = proj.bounceRange || 150;
@@ -205,6 +206,7 @@ const Projectiles = {
                 this.applyProjectileDamage(proj, m, j, index);
                 proj.targetsHit.push(m);
                 
+                // BOUNCE to next target - don't go through
                 if (proj.bounceCount > 0) {
                     let nearest = null;
                     let nd = proj.bounceRange || 100;
@@ -495,6 +497,7 @@ const Projectiles = {
             }
         }
         
+        // PIERCING LOGIC (Crossbow & Machine Gun) - goes THROUGH enemies
         if (proj.weaponRef && proj.weaponRef.pierceCount > 1 && !proj.isShuriken && !proj.isLaser) {
             if (!proj.piercedEnemies) proj.piercedEnemies = [];
             proj.piercedEnemies.push(monster);
@@ -504,9 +507,14 @@ const Projectiles = {
             } else {
                 proj.distanceTraveled = 0;
             }
-        } else if (proj.isLaser || proj.isShuriken) {
+        }
+        // BOUNCING LOGIC (Energy Gun, Shuriken) - redirects to new target
+        else if (proj.isLaser || proj.isShuriken) {
             // Bouncing handled in updateEnergyGun / updateShuriken
-        } else if (!proj.isBoomerang && !proj.bounceCount && !proj.isThrownTrident && !proj.pierceCount && !proj.isShuriken && !proj.isCaltrops) {
+            // Don't remove here
+        }
+        // Regular projectile (no special effects)
+        else if (!proj.isBoomerang && !proj.bounceCount && !proj.isThrownTrident && !proj.pierceCount && !proj.isShuriken && !proj.isCaltrops) {
             this.active.splice(pi, 1);
         }
         

@@ -125,65 +125,7 @@ const Projectiles = {
         }
     },
     
-    placeCaltrops(proj, index) {
-        if (this.caltrops.length < 10) {
-            this.caltrops.push({
-                x: proj.x,
-                y: proj.y,
-                radius: proj.caltropRadius || 40,
-                damage: proj.caltropDamage || 20,
-                interval: proj.caltropInterval || 500,
-                lastTick: Date.now(),
-                startTime: proj.startTime,
-                weaponRef: proj.weaponRef
-            });
-        }
-        this.active.splice(index, 1);
-    },
-    
-    updateCaltrops(currentTime) {
-        for (let i = this.caltrops.length - 1; i >= 0; i--) {
-            const caltrop = this.caltrops[i];
-            for (let monster of Monsters.active) {
-                if (Physics.distance(caltrop, monster) < caltrop.radius + monster.radius) {
-                    if (!monster.lastCaltropTick || currentTime - monster.lastCaltropTick >= caltrop.interval) {
-                        monster.health -= caltrop.damage;
-                        Effects.damageIndicator(monster.x, monster.y, caltrop.damage, false);
-                        monster.lastCaltropTick = currentTime;
-                        if (monster.health <= 0) {
-                            Monsters.handleDeath(monster, Monsters.active.indexOf(monster));
-                        }
-                    }
-                }
-            }
-        }
-    },
-    
-    // Wind projectile from Fan weapon
-    updateWind(proj, index) {
-        // Wind hits multiple enemies in a cone
-        for (let j = Monsters.active.length - 1; j >= 0; j--) {
-            const m = Monsters.active[j];
-            if (proj.targetsHit.includes(m)) continue;
-            if (Physics.distance(proj, m) < m.radius + (proj.size || 10)) {
-                this.applyProjectileDamage(proj, m, j, index);
-                proj.targetsHit.push(m);
-                
-                // Apply knockback
-                const kbAngle = Math.atan2(m.y - proj.y, m.x - proj.x);
-                const kbForce = proj.knockback || 15;
-                m.x += Math.cos(kbAngle) * kbForce;
-                m.y += Math.sin(kbAngle) * kbForce;
-                Physics.clampToArena(m);
-            }
-        }
-        
-        // Wind dissipates after short range
-        if (proj.distanceTraveled > proj.range || !Arena.isInBounds(proj.x, proj.y)) {
-            this.active.splice(index, 1);
-        }
-    },
-    
+    // === SHURIKEN BOUNCING LOGIC ===
     updateShuriken(proj, index) {
         proj.rotation = (proj.rotation || 0) + (proj.spinSpeed || 0.3);
         
@@ -227,6 +169,7 @@ const Projectiles = {
         }
     },
     
+    // === ENERGY GUN BOUNCING LOGIC (Same as Shuriken) ===
     updateEnergyGun(proj, index) {
         for (let j = Monsters.active.length - 1; j >= 0; j--) {
             const m = Monsters.active[j];
@@ -265,6 +208,63 @@ const Projectiles = {
         
         if (proj.distanceTraveled > proj.range || !Arena.isInBounds(proj.x, proj.y)) {
             this.active.splice(index, 1);
+        }
+    },
+    
+    // === WIND PROJECTILE (Fan Weapon) ===
+    updateWind(proj, index) {
+        for (let j = Monsters.active.length - 1; j >= 0; j--) {
+            const m = Monsters.active[j];
+            if (proj.targetsHit.includes(m)) continue;
+            if (Physics.distance(proj, m) < m.radius + (proj.size || 10)) {
+                this.applyProjectileDamage(proj, m, j, index);
+                proj.targetsHit.push(m);
+                
+                // Apply knockback
+                const kbAngle = Math.atan2(m.y - proj.y, m.x - proj.x);
+                const kbForce = proj.knockback || 15;
+                m.x += Math.cos(kbAngle) * kbForce;
+                m.y += Math.sin(kbAngle) * kbForce;
+                Physics.clampToArena(m);
+            }
+        }
+        
+        if (proj.distanceTraveled > proj.range || !Arena.isInBounds(proj.x, proj.y)) {
+            this.active.splice(index, 1);
+        }
+    },
+    
+    placeCaltrops(proj, index) {
+        if (this.caltrops.length < 10) {
+            this.caltrops.push({
+                x: proj.x,
+                y: proj.y,
+                radius: proj.caltropRadius || 40,
+                damage: proj.caltropDamage || 20,
+                interval: proj.caltropInterval || 500,
+                lastTick: Date.now(),
+                startTime: proj.startTime,
+                weaponRef: proj.weaponRef
+            });
+        }
+        this.active.splice(index, 1);
+    },
+    
+    updateCaltrops(currentTime) {
+        for (let i = this.caltrops.length - 1; i >= 0; i--) {
+            const caltrop = this.caltrops[i];
+            for (let monster of Monsters.active) {
+                if (Physics.distance(caltrop, monster) < caltrop.radius + monster.radius) {
+                    if (!monster.lastCaltropTick || currentTime - monster.lastCaltropTick >= caltrop.interval) {
+                        monster.health -= caltrop.damage;
+                        Effects.damageIndicator(monster.x, monster.y, caltrop.damage, false);
+                        monster.lastCaltropTick = currentTime;
+                        if (monster.health <= 0) {
+                            Monsters.handleDeath(monster, Monsters.active.indexOf(monster));
+                        }
+                    }
+                }
+            }
         }
     },
     
@@ -648,14 +648,12 @@ const Projectiles = {
     },
     
     drawWind(ctx, proj) {
-        // Draw wind gust effect
         ctx.save();
         ctx.translate(proj.x, proj.y);
         ctx.rotate(proj.angle);
         ctx.shadowColor = '#87CEEB';
         ctx.shadowBlur = 15;
         
-        // Draw wind lines
         ctx.strokeStyle = 'rgba(135, 206, 235, 0.8)';
         ctx.lineWidth = 3;
         for (let i = -2; i <= 2; i++) {

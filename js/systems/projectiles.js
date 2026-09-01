@@ -105,6 +105,10 @@ const Projectiles = {
                 this.updateEnergyGun(proj, i);
                 continue;
             }
+            if (proj.isWind) {
+                this.updateWind(proj, i);
+                continue;
+            }
             
             if (proj.distanceTraveled > proj.range || !Arena.isInBounds(proj.x, proj.y)) {
                 this.active.splice(i, 1);
@@ -122,7 +126,7 @@ const Projectiles = {
     },
     
     placeCaltrops(proj, index) {
-        if (this.caltrops.length < 5) {
+        if (this.caltrops.length < 10) {
             this.caltrops.push({
                 x: proj.x,
                 y: proj.y,
@@ -155,6 +159,31 @@ const Projectiles = {
         }
     },
     
+    // Wind projectile from Fan weapon
+    updateWind(proj, index) {
+        // Wind hits multiple enemies in a cone
+        for (let j = Monsters.active.length - 1; j >= 0; j--) {
+            const m = Monsters.active[j];
+            if (proj.targetsHit.includes(m)) continue;
+            if (Physics.distance(proj, m) < m.radius + (proj.size || 10)) {
+                this.applyProjectileDamage(proj, m, j, index);
+                proj.targetsHit.push(m);
+                
+                // Apply knockback
+                const kbAngle = Math.atan2(m.y - proj.y, m.x - proj.x);
+                const kbForce = proj.knockback || 15;
+                m.x += Math.cos(kbAngle) * kbForce;
+                m.y += Math.sin(kbAngle) * kbForce;
+                Physics.clampToArena(m);
+            }
+        }
+        
+        // Wind dissipates after short range
+        if (proj.distanceTraveled > proj.range || !Arena.isInBounds(proj.x, proj.y)) {
+            this.active.splice(index, 1);
+        }
+    },
+    
     updateShuriken(proj, index) {
         proj.rotation = (proj.rotation || 0) + (proj.spinSpeed || 0.3);
         
@@ -165,7 +194,7 @@ const Projectiles = {
                 this.applyProjectileDamage(proj, m, j, index);
                 proj.targetsHit.push(m);
                 
-                // BOUNCE to next target - don't go through
+                // BOUNCE to next target
                 if (proj.bounceCount > 0) {
                     let nearest = null;
                     let nd = proj.bounceRange || 150;
@@ -206,7 +235,7 @@ const Projectiles = {
                 this.applyProjectileDamage(proj, m, j, index);
                 proj.targetsHit.push(m);
                 
-                // BOUNCE to next target - don't go through
+                // BOUNCE to next target
                 if (proj.bounceCount > 0) {
                     let nearest = null;
                     let nd = proj.bounceRange || 100;
@@ -498,7 +527,7 @@ const Projectiles = {
         }
         
         // PIERCING LOGIC (Crossbow & Machine Gun) - goes THROUGH enemies
-        if (proj.weaponRef && proj.weaponRef.pierceCount > 1 && !proj.isShuriken && !proj.isLaser) {
+        if (proj.weaponRef && proj.weaponRef.pierceCount > 1 && !proj.isShuriken && !proj.isLaser && !proj.isWind) {
             if (!proj.piercedEnemies) proj.piercedEnemies = [];
             proj.piercedEnemies.push(monster);
             
@@ -511,10 +540,13 @@ const Projectiles = {
         // BOUNCING LOGIC (Energy Gun, Shuriken) - redirects to new target
         else if (proj.isLaser || proj.isShuriken) {
             // Bouncing handled in updateEnergyGun / updateShuriken
-            // Don't remove here
+        }
+        // WIND LOGIC (Fan) - hits multiple but doesn't get removed
+        else if (proj.isWind) {
+            // Don't remove - wind hits multiple
         }
         // Regular projectile (no special effects)
-        else if (!proj.isBoomerang && !proj.bounceCount && !proj.isThrownTrident && !proj.pierceCount && !proj.isShuriken && !proj.isCaltrops) {
+        else if (!proj.isBoomerang && !proj.bounceCount && !proj.isThrownTrident && !proj.pierceCount && !proj.isShuriken && !proj.isCaltrops && !proj.isWind) {
             this.active.splice(pi, 1);
         }
         
@@ -565,6 +597,8 @@ const Projectiles = {
                 this.drawThrownTridentProjectile(ctx, proj);
             } else if (proj.isShuriken) {
                 this.drawShuriken(ctx, proj);
+            } else if (proj.isWind) {
+                this.drawWind(ctx, proj);
             } else if (proj.animation === 'knife') {
                 this.drawKnife(ctx, proj);
             } else if (proj.animation === 'laser') {
@@ -611,6 +645,27 @@ const Projectiles = {
             ctx.restore();
         }
         this.drawCaltrops(ctx);
+    },
+    
+    drawWind(ctx, proj) {
+        // Draw wind gust effect
+        ctx.save();
+        ctx.translate(proj.x, proj.y);
+        ctx.rotate(proj.angle);
+        ctx.shadowColor = '#87CEEB';
+        ctx.shadowBlur = 15;
+        
+        // Draw wind lines
+        ctx.strokeStyle = 'rgba(135, 206, 235, 0.8)';
+        ctx.lineWidth = 3;
+        for (let i = -2; i <= 2; i++) {
+            ctx.beginPath();
+            ctx.moveTo(-15, i * 5);
+            ctx.quadraticCurveTo(0, i * 5 + Math.sin(Date.now() * 0.01 + i) * 5, 15, i * 5);
+            ctx.stroke();
+        }
+        
+        ctx.restore();
     },
     
     drawCaltrops(ctx) {

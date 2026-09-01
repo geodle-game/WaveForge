@@ -15,6 +15,7 @@ const Monsters = {
     clusterSpawnDelay: 500,
     totalSpawned: 0,
     totalToSpawn: 0,
+    respawnQueue: [],
     
     init() { 
         this.active = []; 
@@ -24,6 +25,7 @@ const Monsters = {
         this.currentClusterIndex = 0;
         this.totalSpawned = 0;
         this.totalToSpawn = 0;
+        this.respawnQueue = [];
     },
     
     reset() { 
@@ -34,6 +36,7 @@ const Monsters = {
         this.currentClusterIndex = 0;
         this.totalSpawned = 0;
         this.totalToSpawn = 0;
+        this.respawnQueue = [];
     },
     
     getAttackRange(typeKey, radius) {
@@ -74,11 +77,20 @@ const Monsters = {
             y = pos.y; 
         }
         const radius = (isBoss ? 45 : (15 + Math.random() * 10)) * type.sizeMultiplier;
+        
+        // Bosses move at tank speed
+        let speed;
+        if (isBoss) {
+            speed = 0.5; // Tank monster speed (0.5)
+        } else {
+            speed = (1 + Game.wave * 0.03) * type.speed;
+        }
+        
         const monster = {
             x, y, radius, hitboxRadius: radius * CONFIG.HITBOX.MONSTER,
             health, maxHealth: health, damage,
-            speed: (isBoss ? 0.7 : (1 + Game.wave * 0.03)) * type.speed,
-            originalSpeed: (isBoss ? 0.7 : (1 + Game.wave * 0.03)) * type.speed,
+            speed: speed,
+            originalSpeed: speed,
             color: type.color, type: typeKey, monsterType: type,
             lastAttack: 0, attackCooldown: type.attackCooldown || CONFIG.MONSTER_ATTACK_COOLDOWN,
             isBoss: isBoss || false, isMinion: type.isMinion || false,
@@ -100,6 +112,7 @@ const Monsters = {
             spawnClusterId: null,
             hasExploded: false,
             _dead: false,
+            isBossWave: false,
             spawnTime: Date.now(),
             invulnerableUntil: Date.now() + 300
         };
@@ -112,6 +125,7 @@ const Monsters = {
         this.spawnClusters = [];
         this.currentClusterIndex = 0;
         this.totalSpawned = 0;
+        this.respawnQueue = [];
         
         const countMultiplier = Game.difficultyMultipliers.monsterCountMultiplier || 1;
         const totalMonsters = Math.max(1, Math.floor(waveConfig.monsters * countMultiplier));
@@ -199,7 +213,10 @@ const Monsters = {
                     const distance = Math.random() * spawnRadius;
                     const x = spawnX + Math.cos(angle) * distance;
                     const y = spawnY + Math.sin(angle) * distance;
-                    this.create(typeKey, false, x, y);
+                    const monster = this.create(typeKey, false, x, y);
+                    if (monster) {
+                        monster.isBossWave = this.isBossWaveActive();
+                    }
                     this.totalSpawned++;
                     Game.pendingSpawns--;
                     document.getElementById('monsterCount').textContent = `Monsters: ${Monsters.active.length + Game.pendingSpawns}`;
@@ -213,7 +230,9 @@ const Monsters = {
     },
     
     spawnBoss() {
-        const bossX = CONFIG.CANVAS_WIDTH, bossY = CONFIG.CANVAS_HEIGHT;
+        // Spawn boss in the MIDDLE of arena
+        const bossX = CONFIG.CANVAS_WIDTH / 2;
+        const bossY = CONFIG.CANVAS_HEIGHT / 2;
         Game.pendingSpawns++;
         const indicator = { x: bossX, y: bossY, timer: 2000, startTime: Date.now(), isBoss: true };
         this.spawnIndicators.push(indicator);
@@ -225,11 +244,33 @@ const Monsters = {
             const boss = this.create('BOSS', true, bossX, bossY);
             if (boss) { 
                 boss.lifeSteal = 0.1; 
+                boss.isBossWave = true;
                 Boss.setupBoss(boss, Game.wave); 
             }
             Game.pendingSpawns--;
             document.getElementById('monsterCount').textContent = `Monsters: ${Monsters.active.length + Game.pendingSpawns}`;
         }, 2000);
+    },
+    
+    isBossWaveActive() {
+        return Monsters.active.some(m => m.isBoss);
+    },
+    
+    // Handle respawn queue for boss waves
+    processRespawnQueue(currentTime) {
+        for (let i = this.respawnQueue.length - 1; i >= 0; i--) {
+            const respawn = this.respawnQueue[i];
+            if (currentTime >= respawn.respawnTime) {
+                const typeKey = respawn.typeKey;
+                const x = respawn.x;
+                const y = respawn.y;
+                const monster = this.create(typeKey, false, x, y);
+                if (monster) {
+                    monster.isBossWave = true;
+                }
+                this.respawnQueue.splice(i, 1);
+            }
+        }
     },
     
     remove(monster, index) {
@@ -259,6 +300,16 @@ const Monsters = {
         Player.addGold(goldDrop);
         Game.addKill();
         Effects.deathEffect(monster.x, monster.y);
+        
+        // If it's a boss wave and this is NOT the boss, add to respawn queue
+        if (monster.isBossWave && !monster.isBoss && this.isBossWaveActive()) {
+            this.respawnQueue.push({
+                typeKey: monster.type,
+                x: monster.x,
+                y: monster.y,
+                respawnTime: Date.now() + 3000 // 3 seconds
+            });
+        }
         
         // Explosive monsters explode on death (visual only + damage player)
         if (monster.explosive) {
@@ -305,6 +356,7 @@ const Monsters = {
                 child.originalSpeed = monster.originalSpeed * 1.2; 
                 child.speed = child.originalSpeed; 
                 child.explosive = false;
+                child.isBossWave = monster.isBossWave;
             }
         }
         Effects.explosion(monster.x, monster.y, 50, '#0F0');
@@ -340,6 +392,7 @@ const Monsters = {
         }
         
         this.cleanupDeadMonsters();
+        this.processRespawnQueue(currentTime);
         
         for (let monster of this.active) { 
             if (monster.isDasher) this.updateDasher(monster, currentTime); 

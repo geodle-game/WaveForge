@@ -77,8 +77,8 @@ const Monsters = {
         const monster = {
             x, y, radius, hitboxRadius: radius * CONFIG.HITBOX.MONSTER,
             health, maxHealth: health, damage,
-            speed: (isBoss ? 0.7 : (1 + Game.wave * 0.05)) * type.speed,
-            originalSpeed: (isBoss ? 0.7 : (1 + Game.wave * 0.05)) * type.speed,
+            speed: (isBoss ? 0.7 : (1 + Game.wave * 0.03)) * type.speed,
+            originalSpeed: (isBoss ? 0.7 : (1 + Game.wave * 0.03)) * type.speed,
             color: type.color, type: typeKey, monsterType: type,
             lastAttack: 0, attackCooldown: type.attackCooldown || CONFIG.MONSTER_ATTACK_COOLDOWN,
             isBoss: isBoss || false, isMinion: type.isMinion || false,
@@ -105,7 +105,6 @@ const Monsters = {
         };
         Effects.spawnEffect(x, y, type.color);
         this.active.push(monster);
-        console.log(`🦴 Created ${typeKey} monster at (${x.toFixed(0)}, ${y.toFixed(0)})`);
         return monster;
     },
     
@@ -160,11 +159,9 @@ const Monsters = {
             }
             this.spawnClusters.push(cluster);
         }
-        console.log(`📦 Generated ${this.spawnClusters.length} clusters for ${totalMonsters} monsters`);
     },
     
     spawnWave(waveConfig, isBossWave) {
-        console.log('🔄 Monsters.spawnWave() called');
         this.generateSpawnClusters(waveConfig, isBossWave);
         this.clusterSpawnTimer = Date.now();
         this.currentClusterIndex = 0;
@@ -173,7 +170,6 @@ const Monsters = {
     
     spawnNextCluster() {
         if (this.currentClusterIndex >= this.spawnClusters.length) {
-            console.log('✅ All clusters spawned');
             return;
         }
         const cluster = this.spawnClusters[this.currentClusterIndex];
@@ -190,23 +186,15 @@ const Monsters = {
         };
         this.spawnIndicators.push(indicator);
         
-        console.log(`📍 Spawning cluster ${this.currentClusterIndex + 1}/${this.spawnClusters.length} at (${spawnX.toFixed(0)}, ${spawnY.toFixed(0)}) with ${cluster.monsters.length} monsters`);
-        
         setTimeout(() => {
-            if (Game.state !== GAME_STATE.WAVE) {
-                console.log('⚠️ Game state changed, skipping cluster spawn');
-                return;
-            }
+            if (Game.state !== GAME_STATE.WAVE) return;
             const idx = this.spawnIndicators.indexOf(indicator);
             if (idx > -1) this.spawnIndicators.splice(idx, 1);
             const spawnRadius = 40 + Math.random() * 30;
             for (let i = 0; i < cluster.monsters.length; i++) {
                 const typeKey = cluster.monsters[i];
                 setTimeout(() => {
-                    if (Game.state !== GAME_STATE.WAVE) {
-                        console.log('⚠️ Game state changed, skipping monster spawn');
-                        return;
-                    }
+                    if (Game.state !== GAME_STATE.WAVE) return;
                     const angle = Math.random() * Math.PI * 2;
                     const distance = Math.random() * spawnRadius;
                     const x = spawnX + Math.cos(angle) * distance;
@@ -229,21 +217,15 @@ const Monsters = {
         Game.pendingSpawns++;
         const indicator = { x: bossX, y: bossY, timer: 2000, startTime: Date.now(), isBoss: true };
         this.spawnIndicators.push(indicator);
-        console.log('👑 Spawning boss at center');
         
         setTimeout(() => {
-            if (Game.state !== GAME_STATE.WAVE) { 
-                console.log('⚠️ Game state changed, skipping boss spawn');
-                Game.pendingSpawns--; 
-                return; 
-            }
+            if (Game.state !== GAME_STATE.WAVE) { Game.pendingSpawns--; return; }
             const idx = this.spawnIndicators.indexOf(indicator);
             if (idx > -1) this.spawnIndicators.splice(idx, 1);
             const boss = this.create('BOSS', true, bossX, bossY);
             if (boss) { 
                 boss.lifeSteal = 0.1; 
                 Boss.setupBoss(boss, Game.wave); 
-                console.log('👑 Boss spawned!');
             }
             Game.pendingSpawns--;
             document.getElementById('monsterCount').textContent = `Monsters: ${Monsters.active.length + Game.pendingSpawns}`;
@@ -255,7 +237,6 @@ const Monsters = {
         if (index > -1) this.active.splice(index, 1);
     },
     
-    // Clean up any monsters with 0 HP
     cleanupDeadMonsters() {
         for (let i = this.active.length - 1; i >= 0; i--) {
             const monster = this.active[i];
@@ -298,7 +279,6 @@ const Monsters = {
         const radius = monster.explosionRadius || 100;
         const damage = monster.damage * (monster.explosionDamage || 2);
         
-        // Show explosion effect - visual only
         Effects.explosion(monster.x, monster.y, radius, '#FF4500');
         
         // Damage player only (NOT other monsters)
@@ -359,7 +339,6 @@ const Monsters = {
                 this.spawnIndicators.splice(i, 1); 
         }
         
-        // Clean up dead monsters
         this.cleanupDeadMonsters();
         
         for (let monster of this.active) { 

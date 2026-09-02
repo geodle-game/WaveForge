@@ -2,8 +2,6 @@
 // WAVEFORGE - Monster System (LOGIC)
 // ============================================
 
-// Use window.MONSTER_TYPES – no local variable that might conflict
-const MONSTER_TYPES = window.MONSTER_TYPES || {};
 
 const Monsters = {
     active: [],

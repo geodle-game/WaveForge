@@ -7,7 +7,7 @@ const ITEM_DATA = [
     { id: 'health_potion', name: 'Health Potion', icon: '❤️', type: 'consumable', cost: 50, description: 'Restore 25% of max health' },
     { id: 'ammo_pack', name: 'Ammo Pack', icon: '📦', type: 'consumable', cost: 40, description: 'Fully reload all ranged weapons' },
     { id: 'rage_potion', name: 'Rage Potion', icon: '🔥', type: 'consumable', cost: 60, description: '+30% damage for 10 seconds' },
-    { id: 'bomb', name: 'Bomb', icon: '💣', type: 'consumable', cost: 75, description: 'Large area explosion' },
+    { id: 'bomb', name: 'Bomb', icon: '💣', type: 'consumable', cost: 75, description: 'Large area explosion (3 sec countdown)' },
     { id: 'exp_scroll', name: 'Experience Scroll', icon: '📜✨', type: 'consumable', cost: 500, description: 'Upgrade a random weapon' },
     { id: 'speed_potion', name: 'Speed Potion', icon: '💨', type: 'consumable', cost: 55, description: '+30% speed for 10 seconds' },
     { id: 'shield_potion', name: 'Shield Potion', icon: '🛡️', type: 'consumable', cost: 70, description: 'Invulnerable for 3 seconds' },
@@ -42,9 +42,6 @@ const ITEM_DATA = [
     { id: 'health_regen', name: 'Health Regen', icon: '💚', type: 'permanent', cost: 160, description: 'Regenerate 0.5% HP per second', maxPurchases: 4, effect: { healthRegenPercent: 0.005 } },
     { id: 'armor_plate', name: 'Armor Plate', icon: '🛡️', type: 'permanent', cost: 190, description: 'Reduce damage taken by 3%', maxPurchases: 3, effect: { damageReduction: 0.03 } },
     { id: 'lifesteal_ring', name: 'Lifesteal Ring', icon: '🩸', type: 'permanent', cost: 280, description: 'Heal for 1% of damage dealt', maxPurchases: 3, effect: { lifeSteal: 0.01 } },
-    { id: 'fire_imbue', name: 'Fire Imbue', icon: '🔥', type: 'permanent', cost: 300, description: 'Attacks have 5% chance to burn (3 dmg/sec)', maxPurchases: 2, effect: { fireImbue: true } },
-    { id: 'poison_imbue', name: 'Poison Imbue', icon: '☠️', type: 'permanent', cost: 300, description: 'Attacks have 5% chance to poison (2 dmg/sec)', maxPurchases: 2, effect: { poisonImbue: true } },
-    { id: 'frost_imbue', name: 'Frost Imbue', icon: '❄️', type: 'permanent', cost: 300, description: 'Attacks have 5% chance to slow enemies', maxPurchases: 2, effect: { frostImbue: true } },
     { id: 'piercing_rounds', name: 'Piercing Rounds', icon: '🔩', type: 'permanent', cost: 320, description: 'All projectiles pierce 1 enemy', maxPurchases: 2, effect: { piercingRounds: true } },
     { id: 'double_shot', name: 'Double Shot', icon: '🔫🔫', type: 'permanent', cost: 380, description: 'All weapons fire 2 projectiles', maxPurchases: 2, effect: { doubleShot: true } }
 ];

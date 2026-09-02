@@ -74,6 +74,23 @@ const Effects = {
         this.add({ type: 'lightning', x1, y1, x2, y2, duration: 300 });
     },
     
+    // === NEW MONSTER EFFECTS ===
+    healEffect(x, y, radius) {
+        this.add({ type: 'heal', x, y, radius, color: '#00FF88', duration: 500 });
+    },
+    
+    summonEffect(x, y) {
+        this.add({ type: 'summon', x, y, radius: 40, color: '#FF69B4', duration: 500 });
+    },
+    
+    shieldEffect(x, y, radius) {
+        this.add({ type: 'shield', x, y, radius, color: '#C0C0C0', duration: 300 });
+    },
+    
+    berserkerEffect(x, y) {
+        this.add({ type: 'berserker', x, y, radius: 30, color: '#FF4500', duration: 500 });
+    },
+    
     // Convert world coordinates to screen coordinates
     worldToScreen(x, y) {
         if (typeof Camera !== 'undefined' && Camera) {
@@ -296,6 +313,61 @@ const Effects = {
                     }
                     ctx.stroke();
                     ctx.shadowBlur = 0;
+                    break;
+                    
+                // === NEW MONSTER EFFECTS ===
+                case 'heal':
+                    ctx.strokeStyle = `rgba(0, 255, 136, ${alpha})`;
+                    ctx.lineWidth = 3;
+                    ctx.shadowColor = '#00FF88';
+                    ctx.shadowBlur = 15 * alpha;
+                    ctx.beginPath();
+                    ctx.arc(effect.x, effect.y, effect.radius * (1 + progress), 0, Math.PI * 2);
+                    ctx.stroke();
+                    ctx.fillStyle = `rgba(0, 255, 136, ${alpha * 0.2})`;
+                    ctx.beginPath();
+                    ctx.arc(effect.x, effect.y, effect.radius, 0, Math.PI * 2);
+                    ctx.fill();
+                    break;
+                    
+                case 'summon':
+                    ctx.strokeStyle = `rgba(255, 105, 180, ${alpha})`;
+                    ctx.lineWidth = 3;
+                    ctx.shadowColor = '#FF69B4';
+                    ctx.shadowBlur = 15 * alpha;
+                    for (let i = 0; i < 3; i++) {
+                        const angle = (i / 3) * Math.PI * 2;
+                        const dist = effect.radius * (1 + progress);
+                        ctx.beginPath();
+                        ctx.moveTo(effect.x, effect.y);
+                        ctx.lineTo(effect.x + Math.cos(angle) * dist, effect.y + Math.sin(angle) * dist);
+                        ctx.stroke();
+                    }
+                    break;
+                    
+                case 'shield':
+                    ctx.strokeStyle = `rgba(192, 192, 192, ${alpha})`;
+                    ctx.lineWidth = 3;
+                    ctx.shadowColor = '#C0C0C0';
+                    ctx.shadowBlur = 15 * alpha;
+                    ctx.beginPath();
+                    ctx.arc(effect.x, effect.y, effect.radius * (1 + progress), 0, Math.PI * 2);
+                    ctx.stroke();
+                    break;
+                    
+                case 'berserker':
+                    ctx.strokeStyle = `rgba(255, 69, 0, ${alpha})`;
+                    ctx.lineWidth = 3;
+                    ctx.shadowColor = '#FF4500';
+                    ctx.shadowBlur = 20 * alpha;
+                    for (let i = 0; i < 6; i++) {
+                        const angle = (i / 6) * Math.PI * 2 + progress * Math.PI * 2;
+                        const dist = effect.radius * (1 + progress * 2);
+                        ctx.beginPath();
+                        ctx.moveTo(effect.x, effect.y);
+                        ctx.lineTo(effect.x + Math.cos(angle) * dist, effect.y + Math.sin(angle) * dist);
+                        ctx.stroke();
+                    }
                     break;
             }
             

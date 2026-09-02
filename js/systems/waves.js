@@ -27,6 +27,12 @@ const Waves = {
         for (let i = 0; i < comp.splitter; i++) types.push('SPLITTER');
         for (let i = 0; i < comp.dasher; i++) types.push('DASHER');
         for (let i = 0; i < comp.vampire; i++) types.push('VAMPIRE');
+        for (let i = 0; i < comp.healer; i++) types.push('HEALER');
+        for (let i = 0; i < comp.shield; i++) types.push('SHIELD_BEARER');
+        for (let i = 0; i < comp.teleporter; i++) types.push('TELEPORTER');
+        for (let i = 0; i < comp.summoner; i++) types.push('SUMMONER');
+        for (let i = 0; i < comp.berserker; i++) types.push('BERSERKER');
+        for (let i = 0; i < comp.ghost; i++) types.push('GHOST');
         return types;
     },
     
@@ -42,6 +48,12 @@ const Waves = {
         for (let i = 0; i < comp.splitter; i++) types.push('SPLITTER');
         for (let i = 0; i < comp.dasher; i++) types.push('DASHER');
         for (let i = 0; i < comp.vampire; i++) types.push('VAMPIRE');
+        for (let i = 0; i < comp.healer; i++) types.push('HEALER');
+        for (let i = 0; i < comp.shield; i++) types.push('SHIELD_BEARER');
+        for (let i = 0; i < comp.teleporter; i++) types.push('TELEPORTER');
+        for (let i = 0; i < comp.summoner; i++) types.push('SUMMONER');
+        for (let i = 0; i < comp.berserker; i++) types.push('BERSERKER');
+        for (let i = 0; i < comp.ghost; i++) types.push('GHOST');
         return types.sort(() => Math.random() - 0.5);
     },
     
@@ -52,9 +64,9 @@ const Waves = {
         }
         
         switch (Game.difficulty) {
-            case 'easy': return WAVE_COMPOSITIONS_EASY[waveNum] || { normal: 3, fast: 0, tank: 0, explosive: 0, gunner: 0, splitter: 0, dasher: 0, vampire: 0 };
-            case 'impossible': return WAVE_COMPOSITIONS_IMPOSSIBLE[waveNum] || { normal: 4, fast: 1, tank: 1, explosive: 0, gunner: 1, splitter: 0, dasher: 1, vampire: 0 };
-            default: return WAVE_COMPOSITIONS[waveNum] || { normal: 3, fast: 0, tank: 0, explosive: 0, gunner: 0, splitter: 0, dasher: 0, vampire: 0 };
+            case 'easy': return WAVE_COMPOSITIONS_EASY[waveNum] || { normal: 3, fast: 0, tank: 0, explosive: 0, gunner: 0, splitter: 0, dasher: 0, vampire: 0, healer: 0, shield: 0, teleporter: 0, summoner: 0, berserker: 0, ghost: 0 };
+            case 'impossible': return WAVE_COMPOSITIONS_IMPOSSIBLE[waveNum] || { normal: 4, fast: 1, tank: 1, explosive: 0, gunner: 1, splitter: 0, dasher: 1, vampire: 0, healer: 0, shield: 0, teleporter: 0, summoner: 0, berserker: 0, ghost: 0 };
+            default: return WAVE_COMPOSITIONS[waveNum] || { normal: 3, fast: 0, tank: 0, explosive: 0, gunner: 0, splitter: 0, dasher: 0, vampire: 0, healer: 0, shield: 0, teleporter: 0, summoner: 0, berserker: 0, ghost: 0 };
         }
     },
     
@@ -70,18 +82,23 @@ const Waves = {
             gunner: 5 + scaling * 2,
             splitter: 4 + scaling,
             dasher: 4 + scaling,
-            vampire: 4 + scaling
+            vampire: 4 + scaling,
+            healer: 2 + scaling,
+            shield: 2 + scaling,
+            teleporter: 2 + scaling,
+            summoner: 2 + scaling,
+            berserker: 2 + scaling,
+            ghost: 2 + scaling
         };
     },
     
     // Sandbox wave config
     getSandboxWaveConfig(waveNum) {
         const comp = this.getSandboxComposition(waveNum);
-        const totalSpecial = comp.fast + comp.tank + comp.explosive + comp.gunner + comp.splitter + comp.dasher + comp.vampire;
+        const totalSpecial = comp.fast + comp.tank + comp.explosive + comp.gunner + comp.splitter + comp.dasher + comp.vampire + comp.healer + comp.shield + comp.teleporter + comp.summoner + comp.berserker + comp.ghost;
         const totalMonsters = comp.normal + totalSpecial;
         const wavesPast = waveNum - 40;
         
-        // Boss every 10 waves after 50
         const isBoss = waveNum >= 50 && waveNum % 10 === 0;
         const bossHealth = isBoss ? 30000 * Math.pow(1.3, Math.floor((waveNum - 50) / 10)) : 0;
         
@@ -101,7 +118,6 @@ const Waves = {
         Game.waveActive = true;
         Game.pendingSpawns = 0;
         
-        // Reset per-wave states
         if (Player.firstHitReduction) Player.firstHitActive = true;
         Player.inSlowField = false;
         Player.slowFieldTicks = 0;
@@ -109,7 +125,6 @@ const Waves = {
         
         Player.weapons.forEach(w => {
             if (w.resetEachRound) w.resetAmmo();
-            // Auto-retrieve thrown trident at wave start
             if (w.id === 'spear' && w.isThrown) {
                 w.isThrown = false;
                 w.thrownX = 0;
@@ -118,16 +133,14 @@ const Waves = {
             }
         });
         
-        // Reset systems
         Monsters.reset();
         Boss.reset();
         Projectiles.reset();
         Physics.clear();
-        Towers.reset();          // <-- Clear old towers to prevent stacking
+        Towers.reset();
         
         const waveConfig = this.getWaveConfig(Game.wave);
         
-        // Update wave display
         const waveDisplay = document.getElementById('waveDisplay');
         waveDisplay.classList.remove('boss-wave');
         
@@ -149,37 +162,29 @@ const Waves = {
         waveDisplay.style.opacity = 1;
         setTimeout(() => { waveDisplay.style.opacity = 0.5; }, 2500);
         
-        // Spawn monsters
         if (waveConfig.isBoss || (Game.sandboxMode && Game.wave > 40 && Game.wave % 10 === 0)) {
-            // Boss waves: spawn boss first, then clusters of minions
             Monsters.spawnBoss();
             Monsters.spawnWave(waveConfig, true);
         } else {
-            // Regular waves: spawn in clusters
             Monsters.spawnWave(waveConfig, false);
         }
         
-        // Deploy all towers (landmines, healing towers, turrets) – fresh start each wave
         Towers.deployAll();
-
-        Save.saveGame();  // Auto-save at the start of a wave
+        Save.saveGame();
         
         HUD.updateStats();
         document.getElementById('monsterCount').textContent = `Monsters: ${Monsters.active.length + Game.pendingSpawns}`;
     },
     
-    // Check if wave is complete
     checkWaveEnd() {
         if (!Game.waveActive) return;
         
-        // Wave is complete when all monsters are dead AND no pending spawns
         if (Monsters.active.length === 0 && Game.pendingSpawns === 0) {
             Game.wave++;
             Game.waveComplete();
         }
     },
     
-    // Draw spawn indicators
     drawIndicators() {
         Monsters.drawIndicators();
     }

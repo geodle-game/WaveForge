@@ -167,14 +167,14 @@ const HUD = {
             this.mergeTargetIndex = -1;
         } else {
             const first = Player.weapons[this.selectedWeaponIndex];
-            if (first.id === weapon.id && first.tier === weapon.tier) {
+            
+            // Check if weapons are mergeable (same type and tier)
+            if (first.id === weapon.id && first.tier === weapon.tier && first.tier < 5) {
                 this.mergeTargetIndex = index;
-                const cost = first.getMergeCost(weapon);
-                if (cost > 0 && first.tier < 5) {
-                    document.getElementById('mergeWeaponBtn').style.display = 'block';
-                    document.getElementById('mergeWeaponBtn').innerHTML = `<span>🔄</span> Merge (Cost: ${cost}g)`;
-                }
+                document.getElementById('mergeWeaponBtn').style.display = 'block';
+                document.getElementById('mergeWeaponBtn').innerHTML = `<span>🔄</span> Merge (Free)`;
             } else {
+                // Not mergeable - select this weapon instead
                 this.selectedWeaponIndex = index;
                 document.getElementById('scrapWeaponBtn').style.display = 'block';
                 document.getElementById('scrapWeaponBtn').innerHTML = `<span>🗑️</span> Scrap ${weapon.getDisplayName()} (${weapon.getScrapValue()}g)`;
@@ -202,9 +202,8 @@ const HUD = {
         if (this.selectedWeaponIndex === -1 || this.mergeTargetIndex === -1) return;
         const w1 = Player.weapons[this.selectedWeaponIndex];
         const w2 = Player.weapons[this.mergeTargetIndex];
-        const cost = w1.getMergeCost(w2);
-        if (Game.gold < cost) { Messages.show(`Need ${cost} gold!`); return; }
-        Game.gold -= cost;
+        
+        // Free merge
         const merged = w1.merge(w2);
         Player.weapons[this.selectedWeaponIndex] = merged;
         Player.weapons.splice(this.mergeTargetIndex, 1);

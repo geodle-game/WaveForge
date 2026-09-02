@@ -2,7 +2,6 @@
 // WAVEFORGE - Monster Type Definitions (DATA)
 // ============================================
 
-// Use window to ensure global availability – NO var declaration to avoid conflicts
 window.MONSTER_TYPES = {
     NORMAL: {
         name: 'Normal', color: '#ff6b6b', speed: 1,
@@ -66,8 +65,50 @@ window.MONSTER_TYPES = {
         goldDrop: { min: 15, max: 35 },
         attackRange: 25, attackDamage: 1.1, attackSpeed: 1000
     },
+    HEALER: {
+        name: 'Healer', color: '#00ff88', speed: 0.8,
+        healthMultiplier: 1.0, damageMultiplier: 0.5, sizeMultiplier: 0.9,
+        icon: '💚', isHealer: true, healAmount: 10, healCooldown: 3000, healRadius: 150,
+        goldDrop: { min: 20, max: 40 },
+        attackRange: 20, attackDamage: 0.5, attackSpeed: 2000
+    },
+    SHIELD_BEARER: {
+        name: 'Shield Bearer', color: '#C0C0C0', speed: 0.7,
+        healthMultiplier: 2.0, damageMultiplier: 1.0, sizeMultiplier: 1.2,
+        icon: '🛡️', isShieldBearer: true, shieldDirection: null, shieldAngle: 0,
+        goldDrop: { min: 15, max: 30 },
+        attackRange: 30, attackDamage: 1.0, attackSpeed: 1500
+    },
+    TELEPORTER: {
+        name: 'Teleporter', color: '#9B59B6', speed: 1.0,
+        healthMultiplier: 0.8, damageMultiplier: 1.0, sizeMultiplier: 0.8,
+        icon: '🌀', isTeleporter: true, teleportCooldown: 5000, teleportRange: 200,
+        goldDrop: { min: 20, max: 40 },
+        attackRange: 20, attackDamage: 0.8, attackSpeed: 1000
+    },
+    SUMMONER: {
+        name: 'Summoner', color: '#FF69B4', speed: 0.6,
+        healthMultiplier: 1.5, damageMultiplier: 0.5, sizeMultiplier: 1.1,
+        icon: '🔮', isSummoner: true, summonCooldown: 5000, summonCount: 2,
+        goldDrop: { min: 25, max: 50 },
+        attackRange: 20, attackDamage: 0.5, attackSpeed: 2000
+    },
+    BERSERKER: {
+        name: 'Berserker', color: '#FF4500', speed: 1.2,
+        healthMultiplier: 1.2, damageMultiplier: 1.0, sizeMultiplier: 1.0,
+        icon: '😡', isBerserker: true,
+        goldDrop: { min: 20, max: 40 },
+        attackRange: 25, attackDamage: 1.0, attackSpeed: 1000
+    },
+    GHOST: {
+        name: 'Ghost', color: '#E8E8E8', speed: 1.3,
+        healthMultiplier: 0.7, damageMultiplier: 0.8, sizeMultiplier: 0.9,
+        icon: '👻', isGhost: true,
+        goldDrop: { min: 15, max: 35 },
+        attackRange: 20, attackDamage: 0.8, attackSpeed: 1000
+    },
     BOSS: {
-        name: 'BOSS', color: '#ffd700', speed: 0.7,
+        name: 'BOSS', color: '#ffd700', speed: 0.5,
         healthMultiplier: 15, damageMultiplier: 2.0, sizeMultiplier: 2.2,
         icon: '👑', isBoss: true, lifeSteal: 0.1,
         projectileSpeed: 5, projectileDamage: 15, projectileCooldown: 2000,
@@ -75,5 +116,8 @@ window.MONSTER_TYPES = {
         attackRange: 40, attackDamage: 2.5, attackSpeed: 1500
     }
 };
+
+// Also set as a regular variable for compatibility
+var MONSTER_TYPES = window.MONSTER_TYPES;
 
 console.log('✅ MONSTER_TYPES loaded successfully');

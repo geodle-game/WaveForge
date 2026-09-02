@@ -1,5 +1,5 @@
 // ============================================
-// WAVEFORGE - Monster Brain (Simple Wall Avoidance)
+// WAVEFORGE - Monster Brain (AI System)
 // ============================================
 
 const MonsterBrain = {
@@ -22,6 +22,105 @@ const MonsterBrain = {
     // Dummy function for compatibility with maps.js
     initGrid() {
         console.log('✅ A* grid initialized (simplified)');
+    },
+    
+    // Check if there's a wall between two points
+    isWallBetween(x1, y1, x2, y2) {
+        const dx = x2 - x1;
+        const dy = y2 - y1;
+        const dist = Math.hypot(dx, dy);
+        const steps = Math.ceil(dist / 10);
+        
+        for (let i = 1; i < steps; i++) {
+            const t = i / steps;
+            const px = x1 + dx * t;
+            const py = y1 + dy * t;
+            
+            for (let wall of Arena.walls) {
+                if (wall.destroyed) continue;
+                const halfW = wall.width / 2;
+                const halfH = wall.height / 2;
+                if (px >= wall.x - halfW && px <= wall.x + halfW &&
+                    py >= wall.y - halfH && py <= wall.y + halfH) {
+                    return true;
+                }
+            }
+        }
+        return false;
+    },
+    
+    // Find a waypoint around a wall
+    findWaypointAroundWall(monster, targetX, targetY) {
+        const wall = this.findBlockingWall(monster.x, monster.y, targetX, targetY);
+        if (!wall) return null;
+        
+        const wallHalfW = wall.width / 2 + 20;
+        const wallHalfH = wall.height / 2 + 20;
+        
+        const waypoints = [
+            { x: wall.x - wallHalfW - 10, y: wall.y },
+            { x: wall.x + wallHalfW + 10, y: wall.y },
+            { x: wall.x, y: wall.y - wallHalfH - 10 },
+            { x: wall.x, y: wall.y + wallHalfH + 10 },
+            { x: wall.x - wallHalfW - 10, y: wall.y - wallHalfH - 10 },
+            { x: wall.x + wallHalfW + 10, y: wall.y - wallHalfH - 10 },
+            { x: wall.x - wallHalfW - 10, y: wall.y + wallHalfH + 10 },
+            { x: wall.x + wallHalfW + 10, y: wall.y + wallHalfH + 10 }
+        ];
+        
+        let bestWaypoint = null;
+        let bestDist = Infinity;
+        
+        for (let wp of waypoints) {
+            let insideWall = false;
+            for (let w of Arena.walls) {
+                if (w.destroyed) continue;
+                const halfW = w.width / 2;
+                const halfH = w.height / 2;
+                if (wp.x >= w.x - halfW && wp.x <= w.x + halfW &&
+                    wp.y >= w.y - halfH && wp.y <= w.y + halfH) {
+                    insideWall = true;
+                    break;
+                }
+            }
+            if (insideWall) continue;
+            
+            if (this.isWallBetween(monster.x, monster.y, wp.x, wp.y)) continue;
+            if (this.isWallBetween(wp.x, wp.y, targetX, targetY)) continue;
+            
+            const dist = Math.hypot(wp.x - monster.x, wp.y - monster.y);
+            if (dist < bestDist) {
+                bestDist = dist;
+                bestWaypoint = wp;
+            }
+        }
+        
+        return bestWaypoint;
+    },
+    
+    // Find the wall blocking the path
+    findBlockingWall(x1, y1, x2, y2) {
+        const dx = x2 - x1;
+        const dy = y2 - y1;
+        const dist = Math.hypot(dx, dy);
+        const steps = Math.ceil(dist / 10);
+        
+        for (let i = 1; i < steps; i++) {
+            const t = i / steps;
+            const px = x1 + dx * t;
+            const py = y1 + dy * t;
+            
+            for (let wall of Arena.walls) {
+                if (wall.destroyed) continue;
+                const halfW = wall.width / 2;
+                const halfH = wall.height / 2;
+                if (px >= wall.x - halfW && px <= wall.x + halfW &&
+                    py >= wall.y - halfH && py <= wall.y + halfH) {
+                    return wall;
+                }
+            }
+        }
+        return null;
     },
     
     formFlocks() {
@@ -104,6 +203,36 @@ const MonsterBrain = {
         const player = Player.entity;
         const flock = monster.flockId ? this.flocks.get(monster.flockId) : null;
         
+        // Ghosts pass through walls - direct movement
+        if (monster.isGhost) {
+            return this.getGhostMovement(monster, player);
+        }
+        
+        // Healers stay near other monsters, not directly chase player
+        if (monster.isHealer) {
+            return this.getHealerMovement(monster, player, flock);
+        }
+        
+        // Summoners keep distance from player
+        if (monster.isSummoner) {
+            return this.getSummonerMovement(monster, player);
+        }
+        
+        // Shield Bearers move slowly but steadily toward player
+        if (monster.isShieldBearer) {
+            return this.getShieldBearerMovement(monster, player);
+        }
+        
+        // Teleporters move toward player but teleport closer
+        if (monster.isTeleporter) {
+            return this.getTeleporterMovement(monster, player);
+        }
+        
+        // Berserkers chase player aggressively
+        if (monster.isBerserker) {
+            return this.getBerserkerMovement(monster, player);
+        }
+        
         // Direct movement towards player - simplest and most stable
         let moveX = player.x - monster.x;
         let moveY = player.y - monster.y;
@@ -162,10 +291,9 @@ const MonsterBrain = {
         }
         
         if (blocked) {
-            // Try to slide along walls - check alternative directions
             const alternatives = [
-                {x: moveY, y: -moveX},   // Perpendicular right
-                {x: -moveY, y: moveX},   // Perpendicular left
+                {x: moveY, y: -moveX},
+                {x: -moveY, y: moveX},
                 {x: 1, y: 0},
                 {x: -1, y: 0},
                 {x: 0, y: 1},
@@ -217,6 +345,87 @@ const MonsterBrain = {
         if (finalDist > 0) { moveX /= finalDist; moveY /= finalDist; }
         
         return { x: moveX, y: moveY };
+    },
+    
+    // Ghost movement - passes through walls
+    getGhostMovement(monster, player) {
+        let moveX = player.x - monster.x;
+        let moveY = player.y - monster.y;
+        const dist = Math.hypot(moveX, moveY);
+        if (dist > 0) { moveX /= dist; moveY /= dist; }
+        return { x: moveX, y: moveY };
+    },
+    
+    // Healer movement - stays near other monsters
+    getHealerMovement(monster, player, flock) {
+        // Find nearest friendly monster to heal
+        let nearestAlly = null;
+        let nearestDist = Infinity;
+        for (let other of Monsters.active) {
+            if (other === monster) continue;
+            if (other._dead) continue;
+            const dist = Physics.distance(monster, other);
+            if (dist < nearestDist) {
+                nearestDist = dist;
+                nearestAlly = other;
+            }
+        }
+        
+        // If allies are nearby, move toward them
+        if (nearestAlly && nearestDist < 200) {
+            const moveX = nearestAlly.x - monster.x;
+            const moveY = nearestAlly.y - monster.y;
+            const dist = Math.hypot(moveX, moveY);
+            if (dist > 0) { return { x: moveX / dist, y: moveY / dist }; }
+        }
+        
+        // Otherwise move toward player but keep distance
+        const dx = player.x - monster.x;
+        const dy = player.y - monster.y;
+        const dist = Math.hypot(dx, dy);
+        if (dist > 150) {
+            return { x: dx / dist, y: dy / dist };
+        }
+        return { x: 0, y: 0 };
+    },
+    
+    // Summoner movement - keeps distance from player
+    getSummonerMovement(monster, player) {
+        const dx = player.x - monster.x;
+        const dy = player.y - monster.y;
+        const dist = Math.hypot(dx, dy);
+        
+        // If too close to player, move away
+        if (dist < 150) {
+            return { x: -dx / dist, y: -dy / dist };
+        }
+        
+        // If too far from player, move closer
+        if (dist > 300) {
+            return { x: dx / dist, y: dy / dist };
+        }
+        
+        // Otherwise move toward player slowly
+        return { x: dx / dist, y: dy / dist };
+    },
+    
+    // Shield Bearer movement - moves toward player with shield
+    getShieldBearerMovement(monster, player) {
+        return this.getMovement(monster);
+    },
+    
+    // Teleporter movement - moves toward player
+    getTeleporterMovement(monster, player) {
+        return this.getMovement(monster);
+    },
+    
+    // Berserker movement - chases player aggressively
+    getBerserkerMovement(monster, player) {
+        const dx = player.x - monster.x;
+        const dy = player.y - monster.y;
+        const dist = Math.hypot(dx, dy);
+        if (dist > 0) { return { x: dx / dist, y: dy / dist }; }
+        return { x: 0, y: 0 };
     },
     
     onMonsterDeath(monster) {

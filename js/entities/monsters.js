@@ -49,6 +49,12 @@ const Monsters = {
             case 'SPLITTER': return radius + 25;
             case 'DASHER': return radius + 8;
             case 'VAMPIRE': return radius + 20;
+            case 'HEALER': return radius + 20;
+            case 'SHIELD_BEARER': return radius + 25;
+            case 'TELEPORTER': return radius + 15;
+            case 'SUMMONER': return radius + 20;
+            case 'BERSERKER': return radius + 25;
+            case 'GHOST': return radius + 15;
             case 'BOSS': return radius + 35;
             default: return radius + 15;
         }
@@ -78,10 +84,9 @@ const Monsters = {
         }
         const radius = (isBoss ? 45 : (15 + Math.random() * 10)) * type.sizeMultiplier;
         
-        // Bosses move at tank speed
         let speed;
         if (isBoss) {
-            speed = 0.5; // Tank monster speed (0.5)
+            speed = 0.5; // Tank monster speed
         } else {
             speed = (1 + Game.wave * 0.03) * type.speed;
         }
@@ -113,6 +118,32 @@ const Monsters = {
             hasExploded: false,
             _dead: false,
             isBossWave: false,
+            
+            // New monster properties
+            isHealer: type.isHealer || false,
+            lastHeal: 0,
+            healCooldown: type.healCooldown || 3000,
+            healAmount: type.healAmount || 10,
+            healRadius: type.healRadius || 150,
+            
+            isShieldBearer: type.isShieldBearer || false,
+            shieldDirection: type.shieldDirection || null,
+            shieldAngle: type.shieldAngle || 0,
+            
+            isTeleporter: type.isTeleporter || false,
+            teleportCooldown: type.teleportCooldown || 5000,
+            lastTeleport: 0,
+            teleportRange: type.teleportRange || 200,
+            
+            isSummoner: type.isSummoner || false,
+            summonCooldown: type.summonCooldown || 5000,
+            lastSummon: 0,
+            summonCount: type.summonCount || 2,
+            
+            isBerserker: type.isBerserker || false,
+            
+            isGhost: type.isGhost || false,
+            
             spawnTime: Date.now(),
             invulnerableUntil: Date.now() + 300
         };
@@ -230,7 +261,6 @@ const Monsters = {
     },
     
     spawnBoss() {
-        // Spawn boss in the MIDDLE of arena
         const bossX = CONFIG.CANVAS_WIDTH / 2;
         const bossY = CONFIG.CANVAS_HEIGHT / 2;
         Game.pendingSpawns++;
@@ -256,7 +286,6 @@ const Monsters = {
         return Monsters.active.some(m => m.isBoss);
     },
     
-    // Handle respawn queue for boss waves
     processRespawnQueue(currentTime) {
         for (let i = this.respawnQueue.length - 1; i >= 0; i--) {
             const respawn = this.respawnQueue[i];
@@ -301,22 +330,19 @@ const Monsters = {
         Game.addKill();
         Effects.deathEffect(monster.x, monster.y);
         
-        // If it's a boss wave and this is NOT the boss, add to respawn queue
         if (monster.isBossWave && !monster.isBoss && this.isBossWaveActive()) {
             this.respawnQueue.push({
                 typeKey: monster.type,
                 x: monster.x,
                 y: monster.y,
-                respawnTime: Date.now() + 3000 // 3 seconds
+                respawnTime: Date.now() + 3000
             });
         }
         
-        // Explosive monsters explode on death (visual only + damage player)
         if (monster.explosive) {
             this.explode(monster);
         }
         
-        // Splitter logic
         if (monster.isSplitter) this.split(monster);
         
         MonsterBrain.onMonsterDeath(monster);
@@ -332,7 +358,6 @@ const Monsters = {
         
         Effects.explosion(monster.x, monster.y, radius, '#FF4500');
         
-        // Damage player only (NOT other monsters)
         if (Player.entity && Physics.distance(monster, Player.entity) < radius + Player.entity.radius) {
             Player.takeDamage(damage, monster);
         }
@@ -385,6 +410,82 @@ const Monsters = {
         return false;
     },
     
+    // === NEW MONSTER UPDATES ===
+    updateHealer(monster, currentTime) {
+        if (currentTime - monster.lastHeal >= monster.healCooldown) {
+            // Heal nearby monsters
+            for (let other of this.active) {
+                if (other === monster) continue;
+                if (other._dead) continue;
+                if (Physics.distance(monster, other) < monster.healRadius + other.radius) {
+                    other.health = Math.min(other.maxHealth, other.health + monster.healAmount);
+                    Effects.healthPopup(other.x, other.y, monster.healAmount);
+                }
+            }
+            monster.lastHeal = currentTime;
+            Effects.add({ type: 'heal', x: monster.x, y: monster.y, radius: monster.healRadius, duration: 500 });
+        }
+    },
+    
+    updateShieldBearer(monster, currentTime) {
+        // Face the player
+        if (Player.entity) {
+            monster.shieldAngle = Math.atan2(Player.entity.y - monster.y, Player.entity.x - monster.x);
+        }
+    },
+    
+    updateTeleporter(monster, currentTime) {
+        if (currentTime - monster.lastTeleport >= monster.teleportCooldown) {
+            // Teleport near player
+            if (Player.entity) {
+                const angle = Math.random() * Math.PI * 2;
+                const dist = 100 + Math.random() * monster.teleportRange;
+                const newX = Player.entity.x + Math.cos(angle) * dist;
+                const newY = Player.entity.y + Math.sin(angle) * dist;
+                
+                // Check bounds
+                if (newX > 50 && newX < CONFIG.CANVAS_WIDTH - 50 && newY > 50 && newY < CONFIG.CANVAS_HEIGHT - 50) {
+                    Effects.teleportEffect(monster.x, monster.y);
+                    monster.x = newX;
+                    monster.y = newY;
+                    Effects.teleportEffect(monster.x, monster.y);
+                }
+            }
+            monster.lastTeleport = currentTime;
+        }
+    },
+    
+    updateSummoner(monster, currentTime) {
+        if (currentTime - monster.lastSummon >= monster.summonCooldown) {
+            // Summon minions
+            for (let i = 0; i < monster.summonCount; i++) {
+                const angle = Math.random() * Math.PI * 2;
+                const dist = 30 + Math.random() * 20;
+                const x = monster.x + Math.cos(angle) * dist;
+                const y = monster.y + Math.sin(angle) * dist;
+                const minion = this.create('MINION', false, x, y);
+                if (minion) {
+                    minion.isBossWave = monster.isBossWave;
+                    Effects.spawnEffect(x, y, '#9370db');
+                }
+            }
+            monster.lastSummon = currentTime;
+            Effects.add({ type: 'summon', x: monster.x, y: monster.y, radius: 50, color: '#FF69B4', duration: 500 });
+        }
+    },
+    
+    updateBerserker(monster, currentTime) {
+        // Get faster and stronger as health decreases
+        const healthPercent = monster.health / monster.maxHealth;
+        if (healthPercent < 0.5) {
+            monster.speed = monster.originalSpeed * 1.5;
+            monster.damage = Math.floor(monster.baseDamage * 1.5);
+        } else {
+            monster.speed = monster.originalSpeed;
+            monster.damage = monster.baseDamage;
+        }
+    },
+    
     update(currentTime) {
         for (let i = this.spawnIndicators.length - 1; i >= 0; i--) { 
             if (currentTime - this.spawnIndicators[i].startTime > this.spawnIndicators[i].timer) 
@@ -396,6 +497,11 @@ const Monsters = {
         
         for (let monster of this.active) { 
             if (monster.isDasher) this.updateDasher(monster, currentTime); 
+            if (monster.isHealer) this.updateHealer(monster, currentTime);
+            if (monster.isTeleporter) this.updateTeleporter(monster, currentTime);
+            if (monster.isSummoner) this.updateSummoner(monster, currentTime);
+            if (monster.isBerserker) this.updateBerserker(monster, currentTime);
+            if (monster.isShieldBearer) this.updateShieldBearer(monster, currentTime);
         }
         for (let i = this.active.length - 1; i >= 0; i--) {
             const monster = this.active[i];
@@ -465,6 +571,12 @@ const Monsters = {
             case 'SPLITTER': this.drawSplitterAttack(ctx, monster, progress, alpha); break;
             case 'DASHER': this.drawDasherAttack(ctx, monster, progress, alpha); break;
             case 'VAMPIRE': this.drawVampireAttack(ctx, monster, progress, alpha); break;
+            case 'HEALER': this.drawNormalAttack(ctx, monster, progress, alpha); break;
+            case 'SHIELD_BEARER': this.drawNormalAttack(ctx, monster, progress, alpha); break;
+            case 'TELEPORTER': this.drawNormalAttack(ctx, monster, progress, alpha); break;
+            case 'SUMMONER': this.drawNormalAttack(ctx, monster, progress, alpha); break;
+            case 'BERSERKER': this.drawNormalAttack(ctx, monster, progress, alpha); break;
+            case 'GHOST': this.drawNormalAttack(ctx, monster, progress, alpha); break;
             default: this.drawNormalAttack(ctx, monster, progress, alpha);
         }
         ctx.restore();
@@ -546,6 +658,15 @@ const Monsters = {
             if (monster.isVampire) { ctx.strokeStyle = '#F00'; ctx.lineWidth = 2; ctx.shadowColor = '#F00'; ctx.shadowBlur = 10; ctx.beginPath(); ctx.arc(0, 0, monster.radius + 3, 0, Math.PI * 2); ctx.stroke(); }
             if (monster.poisoned) { ctx.strokeStyle = '#0F0'; ctx.lineWidth = 2; ctx.shadowColor = '#0F0'; ctx.shadowBlur = 10; ctx.beginPath(); ctx.arc(0, 0, monster.radius + 4, 0, Math.PI * 2); ctx.stroke(); }
             if (monster.bleeding) { ctx.strokeStyle = '#F00'; ctx.lineWidth = 2; ctx.shadowColor = '#F00'; ctx.shadowBlur = 8; ctx.setLineDash([3,3]); ctx.beginPath(); ctx.arc(0, 0, monster.radius + 4, 0, Math.PI * 2); ctx.stroke(); ctx.setLineDash([]); }
+            
+            // New monster visual indicators
+            if (monster.isHealer) { ctx.strokeStyle = '#00FF88'; ctx.lineWidth = 2; ctx.shadowColor = '#00FF88'; ctx.shadowBlur = 10; ctx.beginPath(); ctx.arc(0, 0, monster.radius + 3, 0, Math.PI * 2); ctx.stroke(); }
+            if (monster.isShieldBearer) { ctx.strokeStyle = '#C0C0C0'; ctx.lineWidth = 3; ctx.shadowColor = '#C0C0C0'; ctx.shadowBlur = 10; ctx.beginPath(); ctx.arc(0, 0, monster.radius + 5, 0, Math.PI * 2); ctx.stroke(); }
+            if (monster.isTeleporter) { ctx.strokeStyle = '#9B59B6'; ctx.lineWidth = 2; ctx.shadowColor = '#9B59B6'; ctx.shadowBlur = 10; ctx.beginPath(); ctx.arc(0, 0, monster.radius + 4, 0, Math.PI * 2); ctx.stroke(); }
+            if (monster.isSummoner) { ctx.strokeStyle = '#FF69B4'; ctx.lineWidth = 2; ctx.shadowColor = '#FF69B4'; ctx.shadowBlur = 10; ctx.beginPath(); ctx.arc(0, 0, monster.radius + 4, 0, Math.PI * 2); ctx.stroke(); }
+            if (monster.isBerserker) { ctx.strokeStyle = '#FF4500'; ctx.lineWidth = 3; ctx.shadowColor = '#FF4500'; ctx.shadowBlur = 15; ctx.beginPath(); ctx.arc(0, 0, monster.radius + 3, 0, Math.PI * 2); ctx.stroke(); }
+            if (monster.isGhost) { ctx.globalAlpha = 0.7; ctx.strokeStyle = '#E8E8E8'; ctx.lineWidth = 2; ctx.shadowColor = '#E8E8E8'; ctx.shadowBlur = 10; ctx.beginPath(); ctx.arc(0, 0, monster.radius + 3, 0, Math.PI * 2); ctx.stroke(); ctx.globalAlpha = 1; }
+            
             ctx.shadowBlur = 0; ctx.strokeStyle = '#000'; ctx.lineWidth = 2; ctx.beginPath(); ctx.arc(0, 0, monster.radius, 0, Math.PI * 2); ctx.stroke();
             if (monster.monsterType && monster.monsterType.icon) { ctx.fillStyle = 'white'; ctx.font = `${monster.radius}px Arial`; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText(monster.monsterType.icon, 0, 0); }
             const angleToPlayer = Player.entity ? Math.atan2(Player.entity.y - monster.y, Player.entity.x - monster.x) : 0;

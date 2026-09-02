@@ -115,11 +115,37 @@ const Towers = {
     
     spawnTurret() {
         if (!Player.entity) return;
-        const angle = Math.random() * Math.PI * 2;
-        const dist = 100 + Math.random() * 120;
-        const x = Player.entity.x + Math.cos(angle) * dist;
-        const y = Player.entity.y + Math.sin(angle) * dist;
         
+        // Find a stationary position away from player
+        let x, y, valid = false;
+        for (let attempts = 0; attempts < 100; attempts++) {
+            const angle = Math.random() * Math.PI * 2;
+            const dist = 150 + Math.random() * 200;
+            x = Player.entity.x + Math.cos(angle) * dist;
+            y = Player.entity.y + Math.sin(angle) * dist;
+            
+            // Check bounds
+            if (x < 50 || x > CONFIG.CANVAS_WIDTH - 50 || y < 50 || y > CONFIG.CANVAS_HEIGHT - 50) continue;
+            
+            // Check not too close to player
+            if (Physics.distance({x, y}, Player.entity) < 100) continue;
+            
+            // Check not too close to other turrets
+            let tooClose = false;
+            for (let turret of this.turrets.active) {
+                if (Physics.distance({x, y}, turret) < 60) {
+                    tooClose = true; break;
+                }
+            }
+            if (!tooClose) { valid = true; break; }
+        }
+        
+        if (!valid) {
+            x = 100 + Math.random() * (CONFIG.CANVAS_WIDTH - 200);
+            y = 100 + Math.random() * (CONFIG.CANVAS_HEIGHT - 200);
+        }
+        
+        // Turret is STATIONARY - it stays at this position
         this.turrets.active.push({
             x, y, radius: 20, health: 30,
             damage: CONFIG.TURRET_DAMAGE,
@@ -128,16 +154,38 @@ const Towers = {
             lastAttack: 0,
             projectileColor: '#FFD700',
             projectileSpeed: 10,
+            isStationary: true,  // Mark as stationary
             id: Date.now() + Math.random()
         });
     },
     
     spawnFrostTower() {
         if (!Player.entity) return;
-        const angle = Math.random() * Math.PI * 2;
-        const dist = 80 + Math.random() * 120;
-        const x = Player.entity.x + Math.cos(angle) * dist;
-        const y = Player.entity.y + Math.sin(angle) * dist;
+        
+        // Find a stationary position away from player
+        let x, y, valid = false;
+        for (let attempts = 0; attempts < 100; attempts++) {
+            const angle = Math.random() * Math.PI * 2;
+            const dist = 100 + Math.random() * 150;
+            x = Player.entity.x + Math.cos(angle) * dist;
+            y = Player.entity.y + Math.sin(angle) * dist;
+            
+            if (x < 50 || x > CONFIG.CANVAS_WIDTH - 50 || y < 50 || y > CONFIG.CANVAS_HEIGHT - 50) continue;
+            if (Physics.distance({x, y}, Player.entity) < 80) continue;
+            
+            let tooClose = false;
+            for (let tower of this.frostTowers.active) {
+                if (Physics.distance({x, y}, tower) < 60) {
+                    tooClose = true; break;
+                }
+            }
+            if (!tooClose) { valid = true; break; }
+        }
+        
+        if (!valid) {
+            x = 100 + Math.random() * (CONFIG.CANVAS_WIDTH - 200);
+            y = 100 + Math.random() * (CONFIG.CANVAS_HEIGHT - 200);
+        }
         
         this.frostTowers.active.push({
             x, y, radius: 20, health: 30,
@@ -145,16 +193,38 @@ const Towers = {
             radius: CONFIG.FROST_TOWER_RADIUS,
             interval: CONFIG.FROST_TOWER_INTERVAL,
             lastSlow: Date.now(),
+            isStationary: true,
             id: Date.now() + Math.random()
         });
     },
     
     spawnPoisonTower() {
         if (!Player.entity) return;
-        const angle = Math.random() * Math.PI * 2;
-        const dist = 80 + Math.random() * 120;
-        const x = Player.entity.x + Math.cos(angle) * dist;
-        const y = Player.entity.y + Math.sin(angle) * dist;
+        
+        // Find a stationary position away from player
+        let x, y, valid = false;
+        for (let attempts = 0; attempts < 100; attempts++) {
+            const angle = Math.random() * Math.PI * 2;
+            const dist = 100 + Math.random() * 150;
+            x = Player.entity.x + Math.cos(angle) * dist;
+            y = Player.entity.y + Math.sin(angle) * dist;
+            
+            if (x < 50 || x > CONFIG.CANVAS_WIDTH - 50 || y < 50 || y > CONFIG.CANVAS_HEIGHT - 50) continue;
+            if (Physics.distance({x, y}, Player.entity) < 80) continue;
+            
+            let tooClose = false;
+            for (let tower of this.poisonTowers.active) {
+                if (Physics.distance({x, y}, tower) < 60) {
+                    tooClose = true; break;
+                }
+            }
+            if (!tooClose) { valid = true; break; }
+        }
+        
+        if (!valid) {
+            x = 100 + Math.random() * (CONFIG.CANVAS_WIDTH - 200);
+            y = 100 + Math.random() * (CONFIG.CANVAS_HEIGHT - 200);
+        }
         
         this.poisonTowers.active.push({
             x, y, radius: 20, health: 30,
@@ -162,6 +232,7 @@ const Towers = {
             radius: CONFIG.POISON_TOWER_RADIUS,
             interval: CONFIG.POISON_TOWER_INTERVAL,
             lastPoison: Date.now(),
+            isStationary: true,
             id: Date.now() + Math.random()
         });
     },
@@ -221,6 +292,7 @@ const Towers = {
     
     updateTurrets(currentTime) {
         for (let turret of this.turrets.active) {
+            // Turret is STATIONARY - no movement
             if (currentTime - turret.lastAttack < 1000 / turret.attackSpeed) continue;
             
             let target = null;
@@ -254,6 +326,7 @@ const Towers = {
     
     updateFrostTowers(currentTime) {
         for (let tower of this.frostTowers.active) {
+            // Tower is STATIONARY - no movement
             if (currentTime - tower.lastSlow >= tower.interval) {
                 for (let monster of Monsters.active) {
                     if (Physics.distance(tower, monster) < tower.radius + monster.radius) {
@@ -269,6 +342,7 @@ const Towers = {
     
     updatePoisonTowers(currentTime) {
         for (let tower of this.poisonTowers.active) {
+            // Tower is STATIONARY - no movement
             if (currentTime - tower.lastPoison >= tower.interval) {
                 for (let monster of Monsters.active) {
                     if (Physics.distance(tower, monster) < tower.radius + monster.radius) {
@@ -333,7 +407,7 @@ const Towers = {
             ctx.restore();
         }
         
-        // Turrets
+        // Turrets (STATIONARY)
         for (let turret of this.turrets.active) {
             ctx.save();
             ctx.translate(turret.x, turret.y);
@@ -363,8 +437,6 @@ const Towers = {
             ctx.beginPath(); ctx.arc(0, 0, tower.radius, 0, Math.PI * 2); ctx.fill();
             ctx.fillStyle = '#FFF'; ctx.font = 'bold 16px Arial';
             ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText('❄', 0, 0);
-            
-            // Draw radius
             ctx.strokeStyle = 'rgba(30,144,255,0.3)';
             ctx.lineWidth = 1;
             ctx.beginPath(); ctx.arc(0, 0, tower.radius, 0, Math.PI * 2); ctx.stroke();
@@ -379,8 +451,6 @@ const Towers = {
             ctx.beginPath(); ctx.arc(0, 0, tower.radius, 0, Math.PI * 2); ctx.fill();
             ctx.fillStyle = '#00FF00'; ctx.font = 'bold 16px Arial';
             ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText('☠', 0, 0);
-            
-            // Draw radius
             ctx.strokeStyle = 'rgba(75,0,130,0.3)';
             ctx.lineWidth = 1;
             ctx.beginPath(); ctx.arc(0, 0, tower.radius, 0, Math.PI * 2); ctx.stroke();

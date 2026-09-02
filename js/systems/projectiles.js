@@ -79,7 +79,6 @@ const Projectiles = {
         for (let i = this.active.length - 1; i >= 0; i--) {
             const proj = this.active[i];
             
-            // Caltrops are placed on ground
             if (proj.isCaltrops) {
                 this.placeCaltrops(proj, i);
                 continue;
@@ -125,10 +124,8 @@ const Projectiles = {
         }
     },
     
-    // === SHURIKEN BOUNCING LOGIC ===
-    updateShuriken(proj, index) {
-        proj.rotation = (proj.rotation || 0) + (proj.spinSpeed || 0.3);
-        
+    // === ENERGY GUN BOUNCING + PRISM LENS SPLIT ===
+    updateEnergyGun(proj, index) {
         for (let j = Monsters.active.length - 1; j >= 0; j--) {
             const m = Monsters.active[j];
             if (proj.targetsHit.includes(m)) continue;
@@ -136,10 +133,61 @@ const Projectiles = {
                 this.applyProjectileDamage(proj, m, j, index);
                 proj.targetsHit.push(m);
                 
+                // === PRISM LENS SPLIT ===
+                if (proj.weaponRef && proj.weaponRef.forkLaser && !proj.hasSplit) {
+                    proj.hasSplit = true;
+                    
+                    // Split into 2 projectiles at ±45 degrees
+                    const baseAngle = proj.angle;
+                    const splitAngle1 = baseAngle - 0.45;
+                    const splitAngle2 = baseAngle + 0.45;
+                    
+                    const split1 = {
+                        x: proj.x,
+                        y: proj.y,
+                        angle: splitAngle1,
+                        speed: proj.speed,
+                        range: proj.range,
+                        damage: proj.damage * 0.7,
+                        color: proj.color,
+                        weaponId: proj.weaponId,
+                        animation: 'laser',
+                        startTime: Date.now(),
+                        size: proj.size,
+                        weaponRef: proj.weaponRef,
+                        targetsHit: [...proj.targetsHit],
+                        distanceTraveled: 0
+                    };
+                    
+                    const split2 = {
+                        x: proj.x,
+                        y: proj.y,
+                        angle: splitAngle2,
+                        speed: proj.speed,
+                        range: proj.range,
+                        damage: proj.damage * 0.7,
+                        color: proj.color,
+                        weaponId: proj.weaponId,
+                        animation: 'laser',
+                        startTime: Date.now(),
+                        size: proj.size,
+                        weaponRef: proj.weaponRef,
+                        targetsHit: [...proj.targetsHit],
+                        distanceTraveled: 0
+                    };
+                    
+                    this.active.push(split1);
+                    this.active.push(split2);
+                    
+                    // Remove original after splitting
+                    this.active.splice(index, 1);
+                    return;
+                }
+                
                 // BOUNCE to next target
                 if (proj.bounceCount > 0) {
                     let nearest = null;
-                    let nd = proj.bounceRange || 150;
+                    let nd = proj.bounceRange || 100;
                     for (let k = 0; k < Monsters.active.length; k++) {
                         if (k === j || proj.targetsHit.includes(Monsters.active[k])) continue;
                         const d = Physics.distance(m, Monsters.active[k]);
@@ -169,8 +217,10 @@ const Projectiles = {
         }
     },
     
-    // === ENERGY GUN BOUNCING LOGIC (Same as Shuriken) ===
-    updateEnergyGun(proj, index) {
+    // === SHURIKEN BOUNCING LOGIC ===
+    updateShuriken(proj, index) {
+        proj.rotation = (proj.rotation || 0) + (proj.spinSpeed || 0.3);
+        
         for (let j = Monsters.active.length - 1; j >= 0; j--) {
             const m = Monsters.active[j];
             if (proj.targetsHit.includes(m)) continue;
@@ -178,10 +228,9 @@ const Projectiles = {
                 this.applyProjectileDamage(proj, m, j, index);
                 proj.targetsHit.push(m);
                 
-                // BOUNCE to next target
                 if (proj.bounceCount > 0) {
                     let nearest = null;
-                    let nd = proj.bounceRange || 100;
+                    let nd = proj.bounceRange || 150;
                     for (let k = 0; k < Monsters.active.length; k++) {
                         if (k === j || proj.targetsHit.includes(Monsters.active[k])) continue;
                         const d = Physics.distance(m, Monsters.active[k]);
@@ -220,7 +269,6 @@ const Projectiles = {
                 this.applyProjectileDamage(proj, m, j, index);
                 proj.targetsHit.push(m);
                 
-                // Apply knockback
                 const kbAngle = Math.atan2(m.y - proj.y, m.x - proj.x);
                 const kbForce = proj.knockback || 15;
                 m.x += Math.cos(kbAngle) * kbForce;
@@ -653,7 +701,6 @@ const Projectiles = {
         ctx.rotate(proj.angle);
         ctx.shadowColor = '#87CEEB';
         ctx.shadowBlur = 15;
-        
         ctx.strokeStyle = 'rgba(135, 206, 235, 0.8)';
         ctx.lineWidth = 3;
         for (let i = -2; i <= 2; i++) {
@@ -662,7 +709,6 @@ const Projectiles = {
             ctx.quadraticCurveTo(0, i * 5 + Math.sin(Date.now() * 0.01 + i) * 5, 15, i * 5);
             ctx.stroke();
         }
-        
         ctx.restore();
     },
     

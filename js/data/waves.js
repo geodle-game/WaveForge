@@ -89,7 +89,7 @@ const WAVE_COMPOSITIONS = {
     40: { normal: 12, fast: 8, tank: 6, explosive: 5, gunner: 4, splitter: 3, dasher: 3, vampire: 4, healer: 1, shield: 1, teleporter: 1, summoner: 1, berserker: 1, ghost: 1 }
 };
 
-// Easy mode compositions (fewer monsters, no new monsters until later)
+// Easy mode compositions (fewer monsters, new monsters appear later)
 const WAVE_COMPOSITIONS_EASY = {
     1: { normal: 3, fast: 0, tank: 0, explosive: 0, gunner: 0, splitter: 0, dasher: 0, vampire: 0, healer: 0, shield: 0, teleporter: 0, summoner: 0, berserker: 0, ghost: 0 },
     2: { normal: 4, fast: 0, tank: 0, explosive: 0, gunner: 0, splitter: 0, dasher: 0, vampire: 0, healer: 0, shield: 0, teleporter: 0, summoner: 0, berserker: 0, ghost: 0 },
@@ -176,8 +176,5 @@ const WAVE_COMPOSITIONS_IMPOSSIBLE = {
     39: { normal: 36, fast: 20, tank: 18, explosive: 17, gunner: 16, splitter: 13, dasher: 15, vampire: 13, healer: 2, shield: 3, teleporter: 2, summoner: 2, berserker: 2, ghost: 2 },
     40: { normal: 18, fast: 10, tank: 8, explosive: 7, gunner: 6, splitter: 5, dasher: 5, vampire: 4, healer: 1, shield: 1, teleporter: 1, summoner: 1, berserker: 1, ghost: 1 }
 };
-
-// Make MONSTER_TYPES accessible globally
-var MONSTER_TYPES = window.MONSTER_TYPES;
 
 console.log('✅ Waves data loaded with all difficulties');
